@@ -8,7 +8,9 @@ This repository mirrors `typesafe-ai/skills`. Keep every upstream-owned file byt
 
 Use `fork-ops` and read `.agents/fork-ops.toml` before fork work. Verify its capability report before selecting an operation. The installed foundation supplies config inspection and guarded config creation; it does not implement broad upstream sync.
 
-The setup-owned paths are `AGENTS.md`, `.agents/fork-ops.toml`, `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, and `docs/agents/domain.md`. Add another fork-local surface only with a reviewed task decision. Preserve the upstream marketplace and skill files.
+The fork-owned paths are `AGENTS.md`, `.agents/fork-ops.toml`, `.coderabbit.yaml`, `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, and `docs/agents/domain.md`. Add another fork-local surface only with a reviewed task decision. Preserve the upstream marketplace and skill files.
+
+CodeRabbit reviews fork-owned changes and uses normal automatic approval. Do not force approval or bulk thread resolution. Its upstream path filters define review scope; they do not establish source parity. Sync merges require independent tree and ownership verification plus the other approved gates. The historical validation branch tests review behavior without qualifying the complete sync workflow.
 
 Track sync policy and qualification through the Wayfinder map, “Qualify deterministic upstream sync for TypeSafe skills”: https://github.com/nisavid/typesafe-skills/issues/1. Use its child issues and native dependencies to claim work and identify prerequisites. A workflow, fixture, or no-op result does not establish a successful real sync.
 

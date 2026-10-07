@@ -54,6 +54,10 @@ kind = "config"
 path = ".agents/fork-ops.toml"
 
 [[local_surfaces]]
+kind = "config"
+path = ".coderabbit.yaml"
+
+[[local_surfaces]]
 kind = "doc"
 path = "docs/agents/issue-tracker.md"
 

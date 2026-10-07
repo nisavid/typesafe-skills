@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://docs.coderabbit.ai/schema/schema.v2.json
+inheritance: true
+reviews:
+  request_changes_workflow: true
+  allow_author_approval: false
+  auto_review:
+    enabled: true
+    drafts: true
+    base_branches:
+      - "^nisavid/upstream-sync-validation$"
+  # Review scope only: independent source verification is required before sync merges.
+  # Explicit paths keep new upstream files reviewable until ownership is established.
+  path_filters:
+    - "!.claude-plugin/marketplace.json"
+    - "!.claude-plugin/plugin.json"
+    - "!LICENSE"
+    - "!README.md"
+    - "!skills/typesafe-ai/LICENSE"
+    - "!skills/typesafe-ai/SKILL.md"
+  path_instructions:
+    - path: "**"
+      instructions: >-
+        This fork mirrors typesafe-ai/skills. Review fork-owned configuration,
+        automation, and instructions. Excluded upstream files are outside your
+        content review; approval does not establish their source parity.
+        Assess fixes through the normal review process. Do not recommend forced
+        approval or bulk thread resolution as substitutes for addressing findings.
