@@ -1,0 +1,242 @@
+[
+  {
+    "id": "development-spelling",
+    "answer": "no_additional_handling",
+    "rationale": "The spelling correction retains readable English and no fork instruction depends on the original sentence."
+  },
+  {
+    "id": "development-example-variable",
+    "answer": "no_additional_handling",
+    "rationale": "The variable is renamed consistently in its declaration and use; the demonstrated call and returned value remain unchanged."
+  },
+  {
+    "id": "development-markdown-format",
+    "answer": "no_additional_handling",
+    "rationale": "The renderer supports the new paragraph and unordered-list form, preserving readable mode names."
+  },
+  {
+    "id": "development-additive-glossary",
+    "answer": "no_additional_handling",
+    "rationale": "The State definition is retained, and the additional entry does not conflict with a closed-set consumer."
+  },
+  {
+    "id": "development-optional-editor",
+    "answer": "no_additional_handling",
+    "rationale": "Any text editor remains supported and the preview is optional, so the terminal-only contribution path remains available."
+  },
+  {
+    "id": "development-inactive-link",
+    "answer": "no_additional_handling",
+    "rationale": "Complete request syntax remains in the bundled API guide; the absent background essay is unnecessary to assess this obligation."
+  },
+  {
+    "id": "development-scoped-deprecation",
+    "answer": "no_additional_handling",
+    "rationale": "The fork tutorial uses send, which remains documented; deprecating the unused alias does not require adaptation."
+  },
+  {
+    "id": "development-wording-equivalence",
+    "answer": "no_additional_handling",
+    "rationale": "Retrying at most twice preserves the limit of two additional attempts after the initial request."
+  },
+  {
+    "id": "development-renamed-command",
+    "answer": "additional_handling",
+    "rationale": "The fork runbook names sync-now, which is explicitly unsupported; it needs to name catalog-refresh instead."
+  },
+  {
+    "id": "development-renderer-feature",
+    "answer": "additional_handling",
+    "rationale": "The static renderer lacks InteractiveTable and strips its tag, so the fork needs another means to display mode meanings."
+  },
+  {
+    "id": "development-required-editor",
+    "answer": "additional_handling",
+    "rationale": "The upstream instructions remove support for handwritten terminal edits, conflicting with the required supported terminal-only path."
+  },
+  {
+    "id": "development-locale-policy",
+    "answer": "additional_handling",
+    "rationale": "Directly republishing French-only defaults no longer provides the required English default messages."
+  },
+  {
+    "id": "development-platform-floor",
+    "answer": "additional_handling",
+    "rationale": "Python 3.11 falls below the new supported floor of 3.13 and cannot be upgraded by this sync, requiring fork-specific handling or a decision."
+  },
+  {
+    "id": "development-removed-output",
+    "answer": "additional_handling",
+    "rationale": "The fork template consumes the removed explanation field, so preserving upstream requires adapting the template or deciding how to satisfy its obligation."
+  },
+  {
+    "id": "development-example-credential",
+    "answer": "additional_handling",
+    "rationale": "The directly included quickstart now instructs trainees to commit a source example containing an API key, conflicting with the stated training obligation."
+  },
+  {
+    "id": "development-deadline-policy",
+    "answer": "additional_handling",
+    "rationale": "The fork guide still promises thirty days, whereas the upstream submission period is seven days; the fork guide needs adaptation."
+  },
+  {
+    "id": "development-missing-migration",
+    "answer": "insufficient_context",
+    "rationale": "The interface changes to version 2, but the absent migration and command mapping are needed to determine whether the version-1 fork script remains compatible."
+  },
+  {
+    "id": "development-unknown-renderer",
+    "answer": "insufficient_context",
+    "rationale": "Whether the architecture remains visible depends on Mermaid support, and the renderer capabilities are not supplied."
+  },
+  {
+    "id": "development-unknown-python",
+    "answer": "insufficient_context",
+    "rationale": "The deployed Python version is absent, so compatibility with the new 3.12 minimum cannot be established."
+  },
+  {
+    "id": "development-missing-schema",
+    "answer": "insufficient_context",
+    "rationale": "The revised schema is absent, preventing assessment of whether the parser can still read status and summary correctly."
+  },
+  {
+    "id": "development-unknown-locale",
+    "answer": "insufficient_context",
+    "rationale": "The cohort language is absent, so the new Spanish defaults cannot be compared with the fork training requirement."
+  },
+  {
+    "id": "development-missing-support-terms",
+    "answer": "insufficient_context",
+    "rationale": "The education submission terms are absent, so the accuracy of the local thirty-day guide cannot be assessed."
+  },
+  {
+    "id": "development-partial-example",
+    "answer": "insufficient_context",
+    "rationale": "The surrounding example and mode definition are absent, so the changed call cannot be established as a runnable self-contained example."
+  },
+  {
+    "id": "development-unknown-return-policy",
+    "answer": "insufficient_context",
+    "rationale": "The retry conditions expand, but the operator guide is absent, so it is unknown whether that guide already describes them accurately."
+  },
+  {
+    "id": "heldout-version-display",
+    "answer": "no_additional_handling",
+    "rationale": "The about page publishes this upstream file directly without a separate version string, so preserving the update displays the upstream version."
+  },
+  {
+    "id": "heldout-optional-plugin",
+    "answer": "no_additional_handling",
+    "rationale": "The plugin remains optional and the unchanged core path explicitly runs without plugins."
+  },
+  {
+    "id": "heldout-diagnostic-detail",
+    "answer": "no_additional_handling",
+    "rationale": "Failed requests still return an error; the handler ignores the newly added explanatory text."
+  },
+  {
+    "id": "heldout-order-preservation",
+    "answer": "no_additional_handling",
+    "rationale": "The change preserves oldest-first ordering, which is the exercise requirement."
+  },
+  {
+    "id": "heldout-archive-compression",
+    "answer": "no_additional_handling",
+    "rationale": "ZIP remains available, and the installer does not depend on the added tar.gz option."
+  },
+  {
+    "id": "heldout-accessibility-addition",
+    "answer": "no_additional_handling",
+    "rationale": "The annotated diagram remains supplied in its existing location; the transcript is additive."
+  },
+  {
+    "id": "heldout-calendar-example",
+    "answer": "no_additional_handling",
+    "rationale": "Only an optional example time changes; the scheduler retains its separate operator-selected 14:00 UTC configuration."
+  },
+  {
+    "id": "heldout-redistribution-terms",
+    "answer": "additional_handling",
+    "rationale": "The fork distributes a binary bundle containing the component, and the changed terms prohibit that distribution; the provided policy requires a maintainer decision."
+  },
+  {
+    "id": "heldout-unit-change",
+    "answer": "additional_handling",
+    "rationale": "The adapter copies seconds into a milliseconds-labeled field, so it needs a unit conversion to display correct millisecond durations."
+  },
+  {
+    "id": "heldout-callback-contract",
+    "answer": "additional_handling",
+    "rationale": "The callback reads summary from its argument, which now becomes a job identifier; it needs to fetch the result separately."
+  },
+  {
+    "id": "heldout-storage-location",
+    "answer": "additional_handling",
+    "rationale": "Persistent cache data moves into a directory excluded by the fork backup, requiring the backup procedure to cover the new location."
+  },
+  {
+    "id": "heldout-interactive-authentication",
+    "answer": "additional_handling",
+    "rationale": "Every run now requires interactive browser sign-in and rejects environment tokens, conflicting with the unattended job requirement."
+  },
+  {
+    "id": "heldout-network-requirement",
+    "answer": "additional_handling",
+    "rationale": "The help bundle now requires a network connection while the workshop room is offline, requiring a fork-specific solution or decision."
+  },
+  {
+    "id": "heldout-ordering-semantics",
+    "answer": "additional_handling",
+    "rationale": "The panel takes the first result, but alphabetical ordering does not preserve highest-relevance-first display; its ranking handling needs adaptation."
+  },
+  {
+    "id": "heldout-retention-semantics",
+    "answer": "additional_handling",
+    "rationale": "The service now deletes history after twenty-four hours, shorter than the seven-day audit requirement, and the fork stores no local copy."
+  },
+  {
+    "id": "heldout-missing-bundle-membership",
+    "answer": "insufficient_context",
+    "rationale": "The bundle manifest and any Component Z grant are absent, so it is unknown whether the new grant requirement affects or is already satisfied by the release."
+  },
+  {
+    "id": "heldout-missing-metric-unit",
+    "answer": "insufficient_context",
+    "rationale": "The version-2 duration unit is absent, so direct numeric copying cannot be assessed for correct millisecond display."
+  },
+  {
+    "id": "heldout-missing-callback-consumer",
+    "answer": "insufficient_context",
+    "rationale": "The callback implementation is absent and may already fetch result URLs; the change alone does not establish a need for adaptation."
+  },
+  {
+    "id": "heldout-unknown-backup-scope",
+    "answer": "insufficient_context",
+    "rationale": "The shared-store location and backup inclusion rules are absent, so persistent-data coverage cannot be established."
+  },
+  {
+    "id": "heldout-missing-auth-policy",
+    "answer": "insufficient_context",
+    "rationale": "The delegated authentication flow is absent, so whether it supports the unattended job cannot be assessed."
+  },
+  {
+    "id": "heldout-unknown-network-environment",
+    "answer": "insufficient_context",
+    "rationale": "Network availability and endpoint permissions in the deployment environment are absent, so installation compatibility cannot be established."
+  },
+  {
+    "id": "heldout-missing-ranking-definition",
+    "answer": "insufficient_context",
+    "rationale": "Ranking policy B is undefined in the supplied context, so its first result cannot be assessed against the highest-relevance requirement."
+  },
+  {
+    "id": "heldout-unknown-audit-cadence",
+    "answer": "insufficient_context",
+    "rationale": "The audit interval and local-copy behavior are absent, so thirty-day service retention cannot be compared with the obligation to read every job since the preceding run."
+  },
+  {
+    "id": "heldout-real-historical-release",
+    "answer": "no_additional_handling",
+    "rationale": "The supplied fork context requires exact upstream mirroring and states there are no fork-local product changes; preserving all added release files satisfies the provided obligation without a stated fork-specific adaptation need."
+  }
+]

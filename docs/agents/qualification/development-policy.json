@@ -1,0 +1,45 @@
+{
+  "status": "frozen-development-candidate-not-activated",
+  "frozen_at": "2026-10-07T20:44:13.882374+00:00",
+  "model": "jev-1.13.0",
+  "question_sha256": "20aa3418577d02efa61115f71062cffcad98ef14334dda1887b69001ad49c48a",
+  "accept_choice": "no_additional_handling",
+  "minimum_no_additional_handling_probability": 0.96,
+  "all_other_outcomes": "hold",
+  "selection": "Highest threshold retaining every one of the eight development cases labeled no additional handling; all16 expected hold cases remain held. No heldout output was collected or read before freezing this rule.",
+  "development_range": {
+    "minimum_clean_probability": 0.96,
+    "maximum_hold_probability": 0.29
+  },
+  "limits": [
+    "One-shot constructed engineering challenge set, not an estimate of future error probability.",
+    "Independent blind frontier labeling is pending; this candidate is not accepted policy.",
+    "The real historical anchor had an earlier probe with a different question; report it separately from untouched constructed cases."
+  ],
+  "observations_sha256": {
+    "development-additive-glossary.json": "c2c2accba4e4136464c2fff65ab59de5e9813570c2300c2cc0e4e64a11c321a3",
+    "development-deadline-policy.json": "6e16ad9a25d64c7182cfcb340f844eba2ff4c51c669c85c12dec6b6985181d6b",
+    "development-example-credential.json": "56546850593bb44f5ecb2bfd6a96dc36c1aed5164adce7205f8b6dafa3e2488d",
+    "development-example-variable.json": "60f02cd2fe0151539648ff0e52fb462b99b288d54f0b4357ac2dd243ccaea69d",
+    "development-inactive-link.json": "b3d2904cf6cf8817950bb975788b65907d51fa75cc157e61255f1053b9056ff5",
+    "development-locale-policy.json": "2340fb703b4bd43504020971af773c6b043ec3af3a754c6a6973f62c598bb0a3",
+    "development-markdown-format.json": "1ccc15d5a26b5dc8f3301adcd95a371c915f522a1a8c128d71f017ec30fd3cfd",
+    "development-missing-migration.json": "78b5fca96ab645f3da231b99ffaabc29ccf3084bee37161ddacbce0c0b4b52bf",
+    "development-missing-schema.json": "c63961963b429627319ee64ca269ff92a60366bab0649f7e193166e0097ac457",
+    "development-missing-support-terms.json": "fd7d428cc8eab9c6edcab170246af2d46c89d54a45db2da09bda020a8bc99170",
+    "development-optional-editor.json": "14719fcca856f443bdf5a8be36188679f0e16c44678690eec9d3efe6e351546e",
+    "development-partial-example.json": "b4e617dd7726ac5103bf3be39ff345835fa309f336b8387e3e361e3d59a44a5c",
+    "development-platform-floor.json": "46f14b79f07f1611646b9a48dd571e1069665cf9684b52f155dd3e8f86326364",
+    "development-removed-output.json": "b8258856fba4b4847ceec2f35a5758900172b03826be44a8dc55519c26ded6aa",
+    "development-renamed-command.json": "748a889a3b80d56280a1b9ac8bc2be78b6c131f14223b0ef1a9ae686d311daf2",
+    "development-renderer-feature.json": "1bebdad8a62f6a5b7758bce856b53b056cc6a30c3cd2efd963a4a08b81420180",
+    "development-required-editor.json": "916ab3c90ad85a4f1b97c814abf6deaed4d2d421a4ffdfe81fd4768b5d59ff46",
+    "development-scoped-deprecation.json": "ba9b0c261c56e737899ebc727bb55be52c47e153f6885d1bbe397ff6a22ee020",
+    "development-spelling.json": "c93c1154c3e8de2981fb377e5a52edd5329d23c8d55ebd437d48013f83166fd8",
+    "development-unknown-locale.json": "75e634d08b1e36f35a7b64db8117e4576652a64e7ed7f6110f137abab1e54eff",
+    "development-unknown-python.json": "c4ddb7d9b417f8e9d7c88f6075455abc9e4450d7060cc18b2307926344db77b0",
+    "development-unknown-renderer.json": "8c8dc6fce0a3394e266f47c3c0eef380b26e875a292bceb9817769f412f87e4a",
+    "development-unknown-return-policy.json": "dc040d7e22d09b558d57b44a197c723e575a18e9dcab77c720f9645898b16cd4",
+    "development-wording-equivalence.json": "be99bf154292c4d7adf6223cfae8fd3e3b94b5d1aea7321f28b85dec9578b1e1"
+  }
+}

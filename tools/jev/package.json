@@ -1,0 +1,8 @@
+{
+  "name": "typesafe-fork-sync-tools",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "jev-axi": "0.7.2"
+  }
+}

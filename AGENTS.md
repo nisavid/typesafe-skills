@@ -8,7 +8,9 @@ This repository mirrors `typesafe-ai/skills`. Keep every upstream-owned file byt
 
 Use `fork-ops` and read `.agents/fork-ops.toml` before fork work. Verify its capability report before selecting an operation. The installed foundation supplies config inspection and guarded config creation; it does not implement broad upstream sync.
 
-The fork-owned paths are `AGENTS.md`, `.agents/fork-ops.toml`, `.coderabbit.yaml`, `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md`, and `docs/agents/domain.md`. Add another fork-local surface only with a reviewed task decision. Preserve the upstream marketplace and skill files.
+The exact fork-owned file inventory is `owned_paths` in `.agents/fork-sync.json`. Add another fork-local surface only with a reviewed task decision and update that inventory. Preserve the upstream marketplace and skill files.
+
+For upstream reconciliation, qualification, or adoption by another fork, load the repo-local `syncing-upstream` skill at `.agents/skills/syncing-upstream/SKILL.md` and its operating reference, `docs/agents/upstream-sync.md`. It requires separate activation approval and a nonempty hosted validation before dependent adoption. The custom controller uses the maintained policy; publishing it does not activate the installed Fork Ops foundation's unavailable broad-sync capability.
 
 CodeRabbit reviews fork-owned changes and uses normal automatic approval. Do not force approval or bulk thread resolution. Its upstream path filters define review scope; they do not establish source parity. Sync merges require independent tree and ownership verification plus the other approved gates. The historical validation branch tests review behavior without qualifying the complete sync workflow.
 

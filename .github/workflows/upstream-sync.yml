@@ -1,0 +1,177 @@
+name: Upstream sync
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  FORK_SYNC_MODE: ${{ vars.FORK_SYNC_MODE }}
+  FORK_SYNC_APPROVED_REVISION: ${{ vars.FORK_SYNC_APPROVED_REVISION }}
+  FORK_SYNC_FIRST_RUN_NUMBER: ${{ vars.FORK_SYNC_FIRST_RUN_NUMBER }}
+  FORK_SYNC_WORKFLOW_ID: ${{ vars.FORK_SYNC_WORKFLOW_ID }}
+jobs:
+  prepare:
+    if: >-
+      (vars.FORK_SYNC_MODE == 'validation' || vars.FORK_SYNC_MODE == 'production') &&
+      vars.FORK_SYNC_APPROVED_REVISION != '' &&
+      vars.FORK_SYNC_FIRST_RUN_NUMBER != '' && vars.FORK_SYNC_WORKFLOW_ID != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: upstream-sync
+      deployment: false
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+      judgment_binding: ${{ steps.result.outputs.judgment_binding }}
+      approved_revision: ${{ steps.result.outputs.approved_revision }}
+      mode: ${{ steps.result.outputs.mode }}
+      first_run_number: ${{ steps.result.outputs.first_run_number }}
+      workflow_id: ${{ steps.result.outputs.workflow_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ vars.FORK_SYNC_APPROVED_REVISION }}
+          path: controller
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./controller/.github/actions/setup-sync
+      - name: Prepare or resume the verified sync candidate
+        working-directory: controller
+        env:
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+          GH_READ_TOKEN: ${{ secrets.FORK_SYNC_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$GH_TOKEN" && test -n "$GH_READ_TOKEN"
+          git config --global user.name 'Ivan D Vasin'
+          git config --global user.email 'ivan@nisavid.io'
+          git remote set-url origin https://github.com/nisavid/typesafe-skills.git
+          gh auth setup-git --hostname github.com
+          mkdir -p "$RUNNER_TEMP/sync-prepare"
+          set +e
+          python3 -B -m fork_sync reconcile --repo "$PWD" --provingkit "$RUNNER_TEMP/provingkit" \
+            --phase prepare --evidence-dir "$RUNNER_TEMP/sync-prepare" > "$RUNNER_TEMP/prepare-output.json"
+          command_status=$?
+          set -e
+          if [ ! -f "$RUNNER_TEMP/sync-prepare/result.json" ]; then
+            cp "$RUNNER_TEMP/prepare-output.json" "$RUNNER_TEMP/sync-prepare/result.json"
+          fi
+          test "$command_status" -eq 0 || test "$command_status" -eq 2
+      - name: Export the bounded decision
+        id: result
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import html, json, os, pathlib, re
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'sync-prepare/result.json'
+          if not path.is_file():
+              raise SystemExit('Preparation produced no decision record')
+          result = json.loads(path.read_text())
+          status = result.get('status')
+          if status not in ('awaiting_judgment', 'hold', 'noop', 'disabled', 'unknown'):
+              raise SystemExit('Unexpected preparation decision')
+          binding = result.get('judgment_binding', '')
+          if status == 'awaiting_judgment' and not re.fullmatch('[0-9a-f]{64}', binding):
+              raise SystemExit('Invalid judgment binding')
+          if status != 'awaiting_judgment':
+              binding = ''
+          revision = os.environ['FORK_SYNC_APPROVED_REVISION']
+          if not re.fullmatch('[0-9a-f]{40}', revision):
+              raise SystemExit('Invalid controller revision')
+          mode = os.environ['FORK_SYNC_MODE']
+          first = os.environ['FORK_SYNC_FIRST_RUN_NUMBER']
+          workflow = os.environ['FORK_SYNC_WORKFLOW_ID']
+          if mode not in ('validation', 'production') or not all(re.fullmatch('[1-9][0-9]*', item) for item in (first, workflow)):
+              raise SystemExit('Invalid activation settings')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'status={status}\njudgment_binding={binding}\napproved_revision={revision}\n')
+              output.write(f'mode={mode}\nfirst_run_number={first}\nworkflow_id={workflow}\n')
+          reasons = result.get('reasons', [result['reason']] if 'reason' in result else [])
+          summary = {'status': status, 'reasons': [str(item)[:240] for item in reasons[:8]]}
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write('<pre>' + html.escape(json.dumps(summary, indent=2)) + '</pre>\n')
+          PY
+      - name: Retain public preparation evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: upstream-sync-prepare-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sync-prepare/result.json
+          if-no-files-found: ignore
+          retention-days: 30
+  finalize:
+    name: Jev ${{ needs.prepare.outputs.judgment_binding || 'not-requested' }}
+    needs: prepare
+    if: needs.prepare.outputs.status == 'awaiting_judgment'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      FORK_SYNC_APPROVED_REVISION: ${{ needs.prepare.outputs.approved_revision }}
+      FORK_SYNC_MODE: ${{ needs.prepare.outputs.mode }}
+      FORK_SYNC_FIRST_RUN_NUMBER: ${{ needs.prepare.outputs.first_run_number }}
+      FORK_SYNC_WORKFLOW_ID: ${{ needs.prepare.outputs.workflow_id }}
+    environment:
+      name: upstream-sync
+      deployment: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.approved_revision }}
+          path: controller
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./controller/.github/actions/setup-sync
+      - name: Judge once and merge only when every gate passes
+        working-directory: controller
+        env:
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+          GH_READ_TOKEN: ${{ secrets.FORK_SYNC_READ_TOKEN }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$GH_TOKEN" && test -n "$GH_READ_TOKEN" && test -n "$TYPESAFE_API_KEY"
+          git config --global user.name 'Ivan D Vasin'
+          git config --global user.email 'ivan@nisavid.io'
+          git remote set-url origin https://github.com/nisavid/typesafe-skills.git
+          gh auth setup-git --hostname github.com
+          mkdir -p "$RUNNER_TEMP/sync-finalize"
+          set +e
+          python3 -B -m fork_sync reconcile --repo "$PWD" --provingkit "$RUNNER_TEMP/provingkit" \
+            --phase finalize --evidence-dir "$RUNNER_TEMP/sync-finalize" > "$RUNNER_TEMP/finalize-output.json"
+          command_status=$?
+          set -e
+          if [ ! -f "$RUNNER_TEMP/sync-finalize/result.json" ]; then
+            cp "$RUNNER_TEMP/finalize-output.json" "$RUNNER_TEMP/sync-finalize/result.json"
+          fi
+          exit "$command_status"
+      - name: Summarize the final decision
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import html, json, os, pathlib
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'sync-finalize/result.json'
+          if not path.is_file():
+              raise SystemExit('Finalization produced no decision record')
+          result = json.loads(path.read_text())
+          reasons = result.get('reasons', [result['reason']] if 'reason' in result else [])
+          summary = {'status': str(result.get('status'))[:80], 'reasons': [str(item)[:240] for item in reasons[:8]]}
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write('<pre>' + html.escape(json.dumps(summary, indent=2)) + '</pre>\n')
+          PY
+      - name: Retain public final decision evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: upstream-sync-finalize-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sync-finalize/result.json
+          if-no-files-found: ignore
+          retention-days: 30
