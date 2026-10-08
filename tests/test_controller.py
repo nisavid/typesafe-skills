@@ -55,6 +55,50 @@ class HostedResponses:
 
 
 class ControllerTests(unittest.TestCase):
+    def test_incomplete_target_inventory_holds_before_publication_from_a_complete_checkout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git', '-C', str(repo), *args], stderr=subprocess.PIPE).decode().strip()
+            git('init', '-q', '-b', 'main')
+            git('config', 'maintenance.auto', 'false')
+            git('config', 'user.name', 'Test Maintainer')
+            git('config', 'user.email', 'test@example.invalid')
+            (repo / 'README.md').write_text('before\n')
+            git('add', '.')
+            git('commit', '-qm', 'upstream')
+            anchor = git('rev-parse', 'HEAD')
+            policy = {'repository': 'nisavid/typesafe-skills', 'target_branch': 'main',
+                      'owned_paths': ['.agents/fork-sync.json', 'AGENTS.md'], 'upstream_anchor': anchor,
+                      'jev_questions': {}}
+            raw = (json.dumps(policy, indent=2) + '\n').encode()
+            (repo / '.agents').mkdir()
+            (repo / '.agents/fork-sync.json').write_bytes(raw)
+            (repo / 'AGENTS.md').write_text('Fork instructions\n')
+            git('add', '.')
+            git('commit', '-qm', 'complete fork inventory')
+            complete_base = git('rev-parse', 'HEAD')
+            git('rm', '-q', 'AGENTS.md')
+            git('commit', '-qm', 'remove a still-declared fork file')
+            damaged_base = git('rev-parse', 'HEAD')
+            git('checkout', '-q', '--detach', anchor)
+            (repo / 'README.md').write_text('after\n')
+            git('add', '.')
+            git('commit', '-qm', 'upstream update')
+            upstream = git('rev-parse', 'HEAD')
+            git('checkout', '-q', '--detach', complete_base)
+            before = (git('rev-parse', 'HEAD'), git('status', '--porcelain=v1'),
+                      (repo / '.git/index').read_bytes(), git('for-each-ref', '--format=%(refname) %(objectname)'))
+            remote = HostedResponses()
+            result = reconcile(repo, damaged_base, upstream, raw, repo, services=remote)
+            self.assertEqual(result, {'status': 'hold', 'reasons': ['fork-owned file missing: AGENTS.md']})
+            self.assertEqual(remote.published, [])
+            self.assertEqual(remote.merged, [])
+            self.assertEqual((repo / 'AGENTS.md').read_text(), 'Fork instructions\n')
+            self.assertEqual((git('rev-parse', 'HEAD'), git('status', '--porcelain=v1'),
+                              (repo / '.git/index').read_bytes(), git('for-each-ref', '--format=%(refname) %(objectname)')),
+                             before)
+
     def test_publishes_verified_candidate_and_holds_without_hosted_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)

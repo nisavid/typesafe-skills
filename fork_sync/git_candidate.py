@@ -109,6 +109,9 @@ def _construct(repo, base, upstream, policy):
         if path not in owned:
             return {"status": "hold", "reasons": [f"unapproved extra: {path}"]}
     for path in owned:
+        if path not in base_entries or path not in merged_entries:
+            return {"status": "hold", "reasons": [f"fork-owned file missing: {path}"]}
+    for path in owned:
         if merged_entries.get(path) != base_entries.get(path):
             return {"status": "hold", "reasons": [f"fork-owned file changed: {path}"]}
     if git("merge-base", base, upstream).strip().decode() == upstream:

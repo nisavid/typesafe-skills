@@ -43,6 +43,67 @@ class CandidateTests(unittest.TestCase):
         self.git("commit", "-qm", message)
         return self.git("rev-parse", "HEAD")
 
+    def checkout_state(self):
+        paths = self.git("ls-files", "--cached", "--others", "--exclude-standard", "-z").split("\0")
+        return {"head": self.git("rev-parse", "HEAD"),
+                "status": self.git("status", "--porcelain=v1"),
+                "index": (self.repo / ".git/index").read_bytes(),
+                "refs": self.git("for-each-ref", "--format=%(refname) %(objectname)"),
+                "files": {path: (self.repo / path).read_bytes() for path in paths if path}}
+
+    def test_missing_declared_owned_file_holds_a_normal_update_without_checkout_changes(self):
+        before = self.checkout_state()
+        complete = construct(self.repo, self.base, self.upstream, self.policy)
+        self.assertEqual(complete["status"], "candidate", complete)
+        self.assertEqual(self.git("ls-tree", complete["head"], "AGENTS.md"),
+                         self.git("ls-tree", self.base, "AGENTS.md"))
+        self.assertEqual(self.checkout_state(), before)
+        (self.repo / "AGENTS.md").unlink()
+        damaged_base = self.commit("remove a still-declared fork file")
+        self.write("README.md", "Uncommitted local edit\n")
+        self.write("scratch.txt", "Untracked local work\n")
+        before = self.checkout_state()
+        result = construct(self.repo, damaged_base, self.upstream, self.policy)
+        self.assertEqual(result, {"status": "hold", "reasons": ["fork-owned file missing: AGENTS.md"]})
+        self.assertEqual(self.checkout_state(), before)
+
+    def test_missing_declared_owned_file_holds_history_only_update_without_checkout_changes(self):
+        self.git("checkout", "-q", "--detach", self.anchor)
+        self.git("commit", "--allow-empty", "-qm", "history only")
+        upstream = self.git("rev-parse", "HEAD")
+        self.git("checkout", "-q", "--detach", self.base)
+        before = self.checkout_state()
+        complete = construct(self.repo, self.base, upstream, self.policy)
+        self.assertEqual(complete["status"], "candidate", complete)
+        self.assertEqual(complete["changed_paths"], [])
+        self.assertEqual(complete["tree"], self.git("rev-parse", self.base + "^{tree}"))
+        self.assertEqual(self.git("show", "-s", "--format=%P", complete["head"]), f"{self.base} {upstream}")
+        self.assertEqual(self.git("ls-tree", complete["head"], "AGENTS.md"),
+                         self.git("ls-tree", self.base, "AGENTS.md"))
+        self.assertEqual(self.checkout_state(), before)
+        (self.repo / "AGENTS.md").unlink()
+        damaged_base = self.commit("remove a still-declared fork file")
+        self.write("scratch.txt", "Untracked local work\n")
+        before = self.checkout_state()
+        result = construct(self.repo, damaged_base, upstream, self.policy)
+        self.assertEqual(result, {"status": "hold", "reasons": ["fork-owned file missing: AGENTS.md"]})
+        self.assertEqual(self.checkout_state(), before)
+
+    def test_missing_declared_owned_file_holds_incorporated_upstream_without_checkout_changes(self):
+        before = self.checkout_state()
+        complete = construct(self.repo, self.base, self.anchor, self.policy)
+        self.assertEqual(complete["status"], "noop", complete)
+        self.assertEqual(complete["head"], self.base)
+        self.assertEqual(complete["tree"], self.git("rev-parse", self.base + "^{tree}"))
+        self.assertEqual(self.checkout_state(), before)
+        (self.repo / "AGENTS.md").unlink()
+        damaged_base = self.commit("remove a still-declared fork file")
+        self.write("scratch.txt", "Untracked local work\n")
+        before = self.checkout_state()
+        result = construct(self.repo, damaged_base, self.anchor, self.policy)
+        self.assertEqual(result, {"status": "hold", "reasons": ["fork-owned file missing: AGENTS.md"]})
+        self.assertEqual(self.checkout_state(), before)
+
     def test_clean_update_preserves_bytes_parents_and_checkout(self):
         self.write("scratch.txt", "Untracked local work\n")
         self.write("README.md", "Uncommitted local edit\n")
