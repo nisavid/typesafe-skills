@@ -286,10 +286,10 @@ class PublicationTests(unittest.TestCase):
                 args = list(map(str, args))
                 if Path(args[1]).name == "validate_change_navigation.py":
                     args[1] = str(writer / "validate_change_navigation.py")
-                    return world.real_run(args, **kwargs)
+                    return world.real_run([args[0], "-B", *args[1:]], **kwargs)
                 if "-c" in args and any(name in args[args.index("-c") + 1] for name in ("observe_git_diff", "authored_body")):
                     args[args.index("-c") + 2] = str(writer)
-                    return world.real_run(args, **kwargs)
+                    return world.real_run([args[0], "-B", *args[1:]], **kwargs)
                 return world.run(args, **kwargs)
             with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
                 for _ in range(2):
