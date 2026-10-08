@@ -45,6 +45,21 @@ role = "Observed upstream branch"
 sync_eligible = false
 notes = "Sync eligibility and automation remain subject to the reviewed policy decision."
 
+# The custom controller's complete exact-file inventory lives in fork-sync.json.
+# Its activation is separate from this foundation's capability declaration.
+
+[[local_surfaces]]
+kind = "config"
+path = ".agents/fork-sync.json"
+
+[[local_surfaces]]
+kind = "doc"
+path = "docs/agents/upstream-sync.md"
+
+[[local_surfaces]]
+kind = "agent_instruction"
+path = ".agents/skills/syncing-upstream/SKILL.md"
+
 [[local_surfaces]]
 kind = "agent_instruction"
 path = "AGENTS.md"
