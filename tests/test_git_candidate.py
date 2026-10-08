@@ -15,6 +15,8 @@ class CandidateTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(self.temp.name)
         self.git("init", "-q")
+        # Keep detached maintenance from racing temporary-repository cleanup.
+        self.git("config", "maintenance.auto", "false")
         self.git("config", "user.name", "Fixture Author")
         self.git("config", "user.email", "fixture@example.invalid")
         self.write("README.md", "Upstream one\n")
