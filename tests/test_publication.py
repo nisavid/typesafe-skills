@@ -2,6 +2,7 @@
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,7 +13,7 @@ from fork_sync.publication import publish
 
 class HostedWorld:
     """A GitHub/helper process boundary; local Git remains real."""
-    def __init__(self, root):
+    def __init__(self, root, history_only=None):
         self.real_run = subprocess.run
         self.repo = root / "candidate"
         self.dependency = root / "provingkit"
@@ -25,8 +26,13 @@ class HostedWorld:
         self.git(self.repo, "add", "README.md")
         self.git(self.repo, "commit", "-m", "base")
         base = self.git(self.repo, "rev-parse", "HEAD")
-        (self.repo / "README.md").write_text("new\n")
-        self.git(self.repo, "commit", "-am", "upstream")
+        if history_only == "empty":
+            self.git(self.repo, "commit", "--allow-empty", "-m", "upstream history")
+        else:
+            (self.repo / "README.md").write_text("new\n")
+            self.git(self.repo, "commit", "-am", "upstream")
+            if history_only == "reverted":
+                self.git(self.repo, "revert", "--no-edit", "HEAD")
         head = self.git(self.repo, "rev-parse", "HEAD")
         self.git(self.repo, "remote", "add", "origin", "https://github.com/nisavid/typesafe-skills.git")
         (self.dependency / "dependency").write_text("pinned helper boundary fixture\n")
@@ -38,7 +44,7 @@ class HostedWorld:
                        "provingkit_pin": self.git(self.dependency, "rev-parse", "HEAD")}
         self.candidate = {"base": base, "upstream": head, "head": head,
                           "tree": self.git(self.repo, "rev-parse", "HEAD^{tree}"),
-                          "changed_paths": ["README.md"]}
+                          "changed_paths": [] if history_only else ["README.md"]}
         self.branch = "nisavid/upstream-sync/" + head[:12] + "-" + base[:12]
         self.remote_sha = None
         self.pr = None
@@ -111,11 +117,18 @@ class HostedWorld:
     def http(self, request, **kwargs):
         import hashlib
         anchor = "diff-" + hashlib.sha256(b"README.md").hexdigest()
-        if request.full_url.endswith("/files"):
+        if request.full_url.endswith("/commits"):
+            commits = self.git(self.repo, "rev-list", self.candidate["base"] + ".." + self.candidate["head"]).splitlines()
+            html = "".join(f'<a href="{self.pr["url"]}/commits/{commit}">Commit</a>' for commit in commits)
+        elif request.full_url.endswith("/files"):
             html = f'<div id="{anchor}"></div>'
         else:
             html = '<div class="markdown-body"><details><summary><img alt="DIFF"></summary>'
-            html += f'<a href="{self.pr["url"]}/files#{anchor}"><code>README.md</code></a></details>'
+            if self.candidate["changed_paths"]:
+                html += f'<a href="{self.pr["url"]}/files#{anchor}"><code>README.md</code></a></details>'
+            else:
+                comparison = f'https://github.com/nisavid/typesafe-skills/compare/{self.candidate["base"]}...{self.candidate["head"]}'
+                html += f'<a href="{self.pr["url"]}/commits">Review the commits</a><a href="{comparison}">View history</a></details>'
             html += self.candidate["head"] + ' ' + self.candidate["base"] + '</div>'
         if self.break_render:
             html = '<html><body>Sign in to GitHub</body></html>'
@@ -133,7 +146,9 @@ class HostedWorld:
 
 class PublicationTests(unittest.TestCase):
     def setUp(self):
-        environment = patch.dict(os.environ, {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull})
+        environment = patch.dict(os.environ, {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+                                             "GIT_AUTHOR_DATE": "2001-01-04T00:00:00+0000",
+                                             "GIT_COMMITTER_DATE": "2001-01-04T00:00:00+0000"})
         environment.start()
         self.addCleanup(environment.stop)
 
@@ -283,13 +298,30 @@ class PublicationTests(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get("PROVINGKIT_TEST_ROOT"), "set PROVINGKIT_TEST_ROOT for the actual pinned helper contract")
     def test_actual_publisher_creation_readiness_and_reconciliation(self):
+        self._assert_actual_publication()
+
+    @unittest.skipUnless(os.environ.get("PROVINGKIT_TEST_ROOT"), "set PROVINGKIT_TEST_ROOT for the actual pinned helper contract")
+    def test_ancestry_only_updates_publish_and_resume_without_invented_file_changes(self):
+        for history in ("empty", "reverted"):
+            with self.subTest(history=history):
+                self._assert_actual_publication(history)
+
+    @unittest.skipUnless(os.environ.get("PROVINGKIT_TEST_ROOT"), "set PROVINGKIT_TEST_ROOT for the actual pinned helper contract")
+    def test_missing_rendered_history_keeps_the_published_pr_draft(self):
+        self._assert_actual_publication("empty", missing_history=True)
+
+    def _assert_actual_publication(self, history_only=None, missing_history=False):
         dependency = Path(os.environ["PROVINGKIT_TEST_ROOT"])
         writer = dependency / "plugins/mergecraft/skills/writing-reviewable-pr-descriptions/scripts"
         publisher = dependency / "plugins/mergecraft/skills/publishing-reviewable-prs/scripts"
         versionkeeping = dependency / "plugins/versionkeeping/skills/checkpointing-and-publishing-git-work/scripts"
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            world = HostedWorld(root)
+            world = HostedWorld(root, history_only=history_only)
+            if history_only == "reverted":
+                # Keep this fixture sensitive to the planner's set normalization.
+                commits = world.git(world.repo, "rev-list", world.candidate["base"] + ".." + world.candidate["upstream"]).splitlines()
+                self.assertNotEqual(commits, sorted(commits))
             world.git(world.repo, "checkout", "--detach", world.candidate["base"])
             remote = root / "remote.git"
             world.real_run(["git", "init", "--bare", "-b", "main", str(remote)], check=True, capture_output=True)
@@ -335,11 +367,14 @@ p.write_text(json.dumps(state))
                     data_repo = args[args.index("--repo") + 1]
                     world.git(data_repo, "remote", "set-url", "origin", str(remote))
                     args[1] = str(versionkeeping / Path(args[1]).name)
-                elif "-c" in args and any(name in args[args.index("-c")+1] for name in ("observe_git_diff", "authored_body")):
+                elif "-c" in args and any(name in args[args.index("-c")+1] for name in ("observe_git_diff", "observe_git_history", "authored_body")):
                     args[args.index("-c")+2] = str(writer)
                 else:
                     return world.run(args, **kwargs)
-                result = world.real_run(args, **kwargs)
+                # Isolated Python ignores PYTHONDONTWRITEBYTECODE; keep the
+                # shared pinned helper fixture free of generated cache files.
+                executed = [args[0], "-B", *args[1:]] if args[0] == sys.executable else args
+                result = world.real_run(executed, **kwargs)
                 world.pr = json.loads(state.read_text())["pr"]
                 if Path(args[1]).name == "execute_git_publication.py" and not result.returncode:
                     world.remote_sha = world.real_run(["git", "--git-dir", str(remote), "rev-parse",
@@ -351,9 +386,24 @@ p.write_text(json.dumps(state))
                     raise AssertionError("Real helper failed: " + result.stdout + result.stderr)
                 return result
             environment = {"PATH": str(root) + os.pathsep + os.environ["PATH"], "FAKE_FORGE_STATE": str(state)}
-            with patch.dict(os.environ, environment), patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+            def page(request, **kwargs):
+                if missing_history and request.full_url.endswith("/commits"):
+                    world.break_render = True
+                return world.http(request, **kwargs)
+            with patch.dict(os.environ, environment), patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=page):
                 first = publish(world.repo, world.candidate, world.policy, world.dependency)
+                if missing_history:
+                    self.assertEqual(first["status"], "hold", first)
+                    self.assertEqual(first["reason"], "live_history_navigation_unverified")
+                    self.assertTrue(world.pr["isDraft"])
+                    return
                 self.assertEqual(first["status"], "published", first)
+                if history_only:
+                    self.assertEqual(world.git(world.repo, "diff", world.candidate["base"], world.candidate["head"]), "")
+                    self.assertNotEqual(world.candidate["base"], world.candidate["head"])
+                    self.assertIn("No file changes", world.pr["body"])
+                    self.assertIn("/pull/42/commits", world.pr["body"])
+                    self.assertNotIn("/files#diff-", world.pr["body"])
                 self.assertFalse(world.pr["isDraft"])
                 self.assertEqual(world.git(world.repo, "rev-parse", "HEAD"), world.candidate["base"])
                 self.assertEqual((world.repo / "README.md").read_text(), "old\n")

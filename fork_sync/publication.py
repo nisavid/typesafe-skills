@@ -103,7 +103,7 @@ def _body(repository, candidate, rows, pr_number, categories):
                       name + ": " + line_metric(added, deleted) + " (" + meaning + ")")
     summary = _badge("DIFF", "DIFF-57606A", style="for-the-badge") + "&nbsp;"
     summary += " ".join(category_badge(key) for key in groups if any(totals[key]))
-    summary += " " + _badge(f"FILES: {len(rows)} touched", f"FILES-{len(rows)}-5F6B78")
+    summary += (" " if rows else "") + _badge(f"FILES: {len(rows)} touched", f"FILES-{len(rows)}-5F6B78")
     lines = ["<details>", "<summary>" + summary + "</summary>", ""]
     previous = None
     diff = []
@@ -138,7 +138,14 @@ def _body(repository, candidate, rows, pr_number, categories):
         diff.append({"source_path": source, "target_path": path,
                      "additions": added or 0, "deletions": deleted or 0,
                      "category": category, "operation": operation})
-    lines += ["", "<sup>" + TAXONOMY + "</sup>", "", "</details>", "",
+    if not rows:
+        lines.append("No file changes in the reviewer-visible comparison. "
+                     f"[Review the commits](https://github.com/{repository}/pull/{pr_number}/commits) and "
+                     f"[view the immutable history comparison](https://github.com/{repository}/compare/"
+                     f"{candidate['base']}...{candidate['head']}).")
+    if rows:
+        lines += ["", "<sup>" + TAXONOMY + "</sup>"]
+    lines += ["", "</details>", "",
               f"I imported upstream commit `{candidate['upstream']}` onto fork commit `{candidate['base']}`. "
               f"The proposed merge commit is `{candidate['head']}`.", "",
               "Source verification must establish upstream tree parity and unchanged fork-owned paths. "
@@ -162,6 +169,8 @@ class _Page(HTMLParser):
         attrs = dict(attributes)
         if attrs.get("id"):
             self.ids.add(attrs["id"])
+        if tag == "a" and attrs.get("href"):
+            self.links.add(attrs["href"])
         if tag not in {"img", "br", "hr", "input", "meta", "link", "source", "wbr", "area", "base", "embed", "param", "track", "col"}:
             self.depth += 1
         if "markdown-body" in attrs.get("class", "").split() and self.body is None:
@@ -195,9 +204,9 @@ class _Page(HTMLParser):
             self.handle_endtag(tag)
 
 
-def _rendered(url, candidate, rows):
+def _rendered(url, candidate, rows, history=None):
     pages = []
-    for suffix in ("", "/files"):
+    for suffix in ("", "/files" if rows else "/commits"):
         target = url + suffix
         request = urllib.request.Request(target, headers={"User-Agent": "typesafe-fork-sync", "Accept": "text/html"})
         try:
@@ -212,6 +221,13 @@ def _rendered(url, candidate, rows):
         pages.append(page)
     anchors = {"diff-" + _sha(row["target_path"]) for row in rows}
     expected_links = {url + "/files#" + anchor for anchor in anchors}
+    if history is not None:
+        repository_url = url.rsplit("/pull/", 1)[0]
+        expected_links = {url + "/commits", repository_url + "/compare/" + candidate["base"] + "..." + candidate["head"]}
+        observed_links = {urljoin(url, link) for link in pages[1].links}
+        if any(not {repository_url + "/commit/" + commit, url + "/commits/" + commit} & observed_links
+               for commit in history["head_only_commits"]):
+            raise Hold("live_history_navigation_unverified")
     good_body = any(body["diff"] and candidate["head"] in "".join(body["text"]) and
                     candidate["base"] in "".join(body["text"]) and
                     expected_links <= {urljoin(url, link) for link in body["links"]}
@@ -265,8 +281,17 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
                  "from change_navigation.git_observer import observe_git_diff; "
                  "print(json.dumps(observe_git_diff(Path(sys.argv[2]),base_oid=sys.argv[3],head_oid=sys.argv[4])))",
                  writer, repo, candidate["base"], candidate["head"]], repo, env, json_output=True)
-    if (not rows or len(rows) > 100 or sorted(row["target_path"] for row in rows) != sorted(candidate["changed_paths"])):
+    if (len(rows) > 100 or sorted(row["target_path"] for row in rows) != sorted(candidate["changed_paths"])):
         raise Hold("publication_diff_outside_template_contract")
+    history = None
+    if not rows:
+        history = _run([sys.executable, "-I", "-c",
+                        "import sys,json; from pathlib import Path; sys.path.insert(0,sys.argv[1]); "
+                        "from change_navigation.git_observer import observe_git_history; "
+                        "print(json.dumps(observe_git_history(Path(sys.argv[2]),base_oid=sys.argv[3],head_oid=sys.argv[4])))",
+                        writer, repo, candidate["base"], candidate["head"]], repo, env, json_output=True)
+        if not history["head_only_commits"]:
+            raise Hold("publication_history_outside_template_contract")
     title = "chore(sync): import upstream " + candidate["upstream"][:12]
     number = prs[0]["number"] if prs else TOKEN
     body, diff = _body(repository, candidate, rows, number, policy.get("publication_categories", {}))
@@ -287,6 +312,8 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
                 "head": {"ref": owner + ":" + branch, "oid": candidate["head"], "owner": owner, "repository": repository},
                 "candidate": {"title": title, "body_sha256": _sha(body)}, "git_diff": rows,
                 "diff": diff, "stack": [], "baseline": baseline}
+    if history is not None:
+        manifest.update(version=4, git_history=history)
     manifest["content_sha256"] = _sha(json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
     manifest_path = _write(temporary / "manifest.json", manifest)
     body_path = temporary / "body.md"
@@ -298,7 +325,7 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
            "--git-repository", repo, "--review-input", manifest_path,
            *(["--template-body", body_path] if not prs else []), rendered_path, structured=False)
     if not remote:
-        adopted = _git(repo, env, "rev-list", candidate["base"] + ".." + candidate["upstream"]).splitlines()
+        adopted = sorted(_git(repo, env, "rev-list", candidate["base"] + ".." + candidate["upstream"]).splitlines())
         request = {"schema_version": 2, "start_head": candidate["base"], "source_sha": candidate["head"],
                    "task_owned_commits": [candidate["head"]], "adopted_commits": adopted,
                    "removal_authorized_commits": [], "explicit_destination": {"remote": "origin", "ref": ref},
@@ -335,7 +362,7 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
             live.get("headRefName") != branch or live.get("headRepositoryOwner", {}).get("login") != owner or
             live.get("headRepository", {}).get("name") != repository.split("/")[1]):
         raise Hold("published_pr_identity_drift")
-    _rendered(url, candidate, rows)
+    _rendered(url, candidate, rows, history)
     bound = [*identity, "--pr", str(number)]
     provenance = "canonical"
     if prs:
@@ -357,7 +384,7 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
         raise Hold("publication_audit_unverified")
     return {"status": "published", "pr_number": number, "url": url, "head_branch": branch,
             "head": candidate["head"], "base": candidate["base"],
-            "evidence": {"rendering": "live_structure_and_anchors_verified", "publication_audit": "verified",
+            "evidence": {"rendering": "live_structure_and_history_links_verified" if history else "live_structure_and_anchors_verified", "publication_audit": "verified",
                          "provenance": provenance, "receipt_retention": "private_ephemeral_run",
                          "relation_context": None}}
 

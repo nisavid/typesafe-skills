@@ -7,7 +7,7 @@
   "upstream_branch": "main",
   "upstream_anchor": "619f78a23e52cadfed03c9483235e2f333ad2416",
   "candidate_prefix": "nisavid/upstream-sync/",
-  "provingkit_pin": "cdfdef5d940b165051cc99845ce6cb80c5660006",
+  "provingkit_pin": "379ab8740c7e2541cc93bc2ac986f7fcb29b6c12",
   "owned_paths": [
     ".agents/fork-ops.toml",
     ".agents/fork-sync.json",

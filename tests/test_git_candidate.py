@@ -64,6 +64,26 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(held["status"], "hold", held)
         self.assertIn("upstream parity", " ".join(held["reasons"]))
 
+    def test_new_history_with_unchanged_tree_is_a_candidate_until_incorporated(self):
+        for history in ("empty", "reverted"):
+            with self.subTest(history=history):
+                self.git("checkout", "-q", "--detach", self.anchor)
+                if history == "empty":
+                    self.git("commit", "--allow-empty", "-qm", "history only")
+                else:
+                    self.write("README.md", "Temporary upstream change\n")
+                    self.commit("change")
+                    self.git("revert", "--no-edit", "HEAD")
+                upstream = self.git("rev-parse", "HEAD")
+                self.git("checkout", "-q", "--detach", self.base)
+                result = construct(self.repo, self.base, upstream, self.policy)
+                self.assertEqual(result["status"], "candidate", result)
+                self.assertEqual(result["changed_paths"], [])
+                self.assertEqual(result["tree"], self.git("rev-parse", self.base + "^{tree}"))
+                self.assertEqual(self.git("show", "-s", "--format=%P", result["head"]), f"{self.base} {upstream}")
+                self.assertEqual(construct(self.repo, result["head"], upstream, self.policy)["status"], "noop")
+                self.assertEqual(self.git("rev-parse", "HEAD"), self.base)
+
     def test_upstream_claiming_fork_path_holds_even_with_identical_bytes(self):
         self.git("checkout", "-q", "--detach", self.upstream)
         self.write("AGENTS.md", "Fork instructions\n")

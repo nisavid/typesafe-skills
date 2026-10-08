@@ -47,6 +47,12 @@
       "prompt": "The last merge request timed out. Continue this sync.",
       "fixture": "The timeout occurred after write submission; no post-write observation is supplied.",
       "expect": "Invoke the procedure and observe the live state before any further write. Do not blindly repeat the merge request."
+    },
+    {
+      "id": "ancestry-only-success",
+      "prompt": "Reconcile this upstream update and report what changed.",
+      "fixture": "Upstream contains a new empty commit or a change followed by its reversal. The candidate preserves both parents and has the same tree as the fork base. All current gates pass. Use actual guarded publication helpers with controlled GitHub HTML and responses.",
+      "expect": "Publish a zero-file PR with verified commit-history navigation and preserve ancestry on merge. Do not call the update a no-op, invent changed files, or claim hosted qualification from local evidence. Missing normal approval or history evidence holds."
     }
   ]
 }

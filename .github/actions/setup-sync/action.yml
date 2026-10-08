@@ -28,7 +28,7 @@ runs:
         mkdir -p "$dependency" "$RUNNER_TEMP/empty-git-template"
         git init --quiet --template="$RUNNER_TEMP/empty-git-template" "$dependency"
         git -C "$dependency" -c core.hooksPath=/dev/null fetch --quiet --depth=1 --no-tags --no-recurse-submodules \
-          https://github.com/nisavid/provingkit.git cdfdef5d940b165051cc99845ce6cb80c5660006
-        git -C "$dependency" -c core.hooksPath=/dev/null checkout --quiet --detach cdfdef5d940b165051cc99845ce6cb80c5660006
-        test "$(git -C "$dependency" rev-parse HEAD)" = cdfdef5d940b165051cc99845ce6cb80c5660006
+          https://github.com/nisavid/provingkit.git 379ab8740c7e2541cc93bc2ac986f7fcb29b6c12
+        git -C "$dependency" -c core.hooksPath=/dev/null checkout --quiet --detach 379ab8740c7e2541cc93bc2ac986f7fcb29b6c12
+        test "$(git -C "$dependency" rev-parse HEAD)" = 379ab8740c7e2541cc93bc2ac986f7fcb29b6c12
         echo "PROVINGKIT_TEST_ROOT=$dependency" >> "$GITHUB_ENV"
