@@ -5,6 +5,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
+from fork_sync.gates import evaluate
 from fork_sync.github import merge, observe
 
 
@@ -66,6 +67,127 @@ class FakeGitHub:
 
 
 class GitHubTests(unittest.TestCase):
+    def evaluate_routes(self, candidate, policy, routes):
+        policy.setdefault("required_checks", [{"name": "sync-ci", "app_id": 15368}])
+        policy.update({"coderabbit_user_id": 136622811,
+                       "jev_model": "jev-1.13.0", "jev_min_probability": 0.96})
+        with patch("subprocess.run", side_effect=FakeGitHub(routes)):
+            observation = observe(REPOSITORY, 9, "main", candidate, policy)
+        observation["jev"] = {
+            "binding": candidate.copy(), "model": "jev-1.13.0",
+            "cached": False, "question_type": "choice",
+            "options": ["no_additional_handling", "additional_handling", "insufficient_context"],
+            "answer": "no_additional_handling",
+            "probabilities": {"no_additional_handling": 0.96,
+                              "additional_handling": 0.03, "insufficient_context": 0.01},
+            "state_sha256": "1" * 64, "observed_state_sha256": "1" * 64,
+        }
+        return evaluate(candidate, observation, policy)
+
+    def test_identical_successful_suites_on_one_page_allow_readiness(self):
+        candidate, policy, routes = fixture()
+        self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                         {"status": "ready", "reasons": []})
+        page = routes[f"repos/owner/fork/commits/{HEAD}/check-runs?filter=latest&per_page=100"][0]
+        page["check_runs"][0].update({"id": 100, "check_suite": {"id": 200}})
+        page["check_runs"].append(dict(page["check_runs"][0], id=101, check_suite={"id": 201}))
+        page["total_count"] = 2
+        self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                         {"status": "ready", "reasons": []})
+
+    def test_identical_successful_suites_across_pages_allow_readiness(self):
+        candidate, policy, routes = fixture()
+        pages = routes[f"repos/owner/fork/commits/{HEAD}/check-runs?filter=latest&per_page=100"]
+        pages[0]["total_count"] = 2
+        pages.append({"total_count": 2, "check_runs": [dict(pages[0]["check_runs"][0])]})
+        self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                         {"status": "ready", "reasons": []})
+
+    def test_conflicting_repeated_check_identity_holds_on_any_page(self):
+        for mutation in ({"head_sha": "0" * 40}, {"status": "in_progress"},
+                         {"conclusion": "failure"}):
+            for separate_page in (False, True):
+                for conflicting_first in (False, True):
+                    with self.subTest(mutation=mutation, separate_page=separate_page,
+                                      conflicting_first=conflicting_first):
+                        candidate, policy, routes = fixture()
+                        pages = routes[f"repos/owner/fork/commits/{HEAD}/check-runs?filter=latest&per_page=100"]
+                        original = pages[0]["check_runs"][0]
+                        records = [original, dict(original, **mutation)]
+                        if conflicting_first:
+                            records.reverse()
+                        routes[f"repos/owner/fork/commits/{HEAD}/check-runs?filter=latest&per_page=100"] = (
+                            [{"total_count": 2, "check_runs": [record]} for record in records]
+                            if separate_page else [{"total_count": 2, "check_runs": records}])
+                        self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                                         {"status": "hold", "reasons": ["missing_required_checks"]})
+
+    def test_identical_failed_pending_or_wrong_head_checks_still_hold(self):
+        for mutation in ({"head_sha": "0" * 40}, {"status": "in_progress", "conclusion": None},
+                         {"conclusion": "failure"}):
+            with self.subTest(mutation=mutation):
+                candidate, policy, routes = fixture()
+                page = routes[f"repos/owner/fork/commits/{HEAD}/check-runs?filter=latest&per_page=100"][0]
+                page["check_runs"][0].update(mutation)
+                page["check_runs"].append(dict(page["check_runs"][0]))
+                page["total_count"] = 2
+                self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                                 {"status": "hold", "reasons": ["checks_not_passed"]})
+
+    def test_incomplete_or_malformed_raw_check_pages_hold_before_collapsing(self):
+        for replacement in ([], [None], [{"total_count": 1}],
+                            [{"total_count": True, "check_runs": []}]):
+            with self.subTest(replacement=replacement):
+                candidate, policy, routes = fixture()
+                routes[f"repos/owner/fork/commits/{HEAD}/check-runs?filter=latest&per_page=100"] = replacement
+                self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                                 {"status": "hold", "reasons": ["stale_observation"]})
+        for counts in ((1,), (3,), (2, 1)):
+            with self.subTest(counts=counts):
+                candidate, policy, routes = fixture()
+                endpoint = f"repos/owner/fork/commits/{HEAD}/check-runs?filter=latest&per_page=100"
+                check = routes[endpoint][0]["check_runs"][0]
+                routes[endpoint] = ([{"total_count": counts[0], "check_runs": [check, dict(check)]}]
+                                    if len(counts) == 1 else
+                                    [{"total_count": count, "check_runs": [dict(check)]} for count in counts])
+                self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                                 {"status": "hold", "reasons": ["stale_observation"]})
+
+    def test_required_checks_with_different_names_or_apps_stay_distinct(self):
+        for mutation, required in (({"name": "second-ci"}, {"name": "second-ci", "app_id": 15368}),
+                                   ({"app": {"id": 1}}, {"name": "sync-ci", "app_id": 1})):
+            with self.subTest(mutation=mutation):
+                candidate, policy, routes = fixture()
+                policy["required_checks"] = [{"name": "sync-ci", "app_id": 15368}, required]
+                routes["repos/owner/fork/branches/main/protection"]["required_status_checks"]["checks"].append(
+                    {"context": required["name"], "app_id": required["app_id"]})
+                page = routes[f"repos/owner/fork/commits/{HEAD}/check-runs?filter=latest&per_page=100"][0]
+                page["check_runs"].append(dict(page["check_runs"][0], **mutation))
+                page["total_count"] = 2
+                self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                                 {"status": "ready", "reasons": []})
+                page["check_runs"][1]["conclusion"] = "failure"
+                self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                                 {"status": "hold", "reasons": ["checks_not_passed"]})
+
+    def test_boolean_or_float_app_ids_cannot_collapse_into_a_valid_integer(self):
+        for invalid_app_id in (True, 1.0):
+            for invalid_first in (False, True):
+                with self.subTest(invalid_app_id=invalid_app_id, invalid_first=invalid_first):
+                    candidate, policy, routes = fixture()
+                    policy["required_checks"] = [{"name": "sync-ci", "app_id": 1}]
+                    routes["repos/owner/fork/branches/main/protection"]["required_status_checks"]["checks"][0]["app_id"] = 1
+                    page = routes[f"repos/owner/fork/commits/{HEAD}/check-runs?filter=latest&per_page=100"][0]
+                    page["check_runs"][0]["app"] = {"id": 1}
+                    self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                                     {"status": "ready", "reasons": []})
+                    page["check_runs"].append(dict(page["check_runs"][0], app={"id": invalid_app_id}))
+                    if invalid_first:
+                        page["check_runs"].reverse()
+                    page["total_count"] = 2
+                    self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                                     {"status": "hold", "reasons": ["missing_required_checks"]})
+
     def test_transport_failures_are_redacted(self):
         for response in (OSError("sensitive transport detail"),
                          subprocess.CompletedProcess("gh", 1, "secret output", "secret stderr"),

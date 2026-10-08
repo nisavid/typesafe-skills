@@ -84,6 +84,8 @@ def observe(repository: str, pr_number: int, target_branch: str,
         if not check_pages or any(type(page["total_count"]) is not int
                 or page["total_count"] != len(checks) for page in check_pages):
             raise ValueError("check_pages_incomplete")
+        # JSON equality keeps malformed Boolean/float app IDs distinct from integers.
+        checks = list({json.dumps(check, sort_keys=True): check for check in checks}.values())
         review_pages = _api(f"{prefix}/pulls/{pr_number}/reviews?per_page=100", paginate=True)
         if not isinstance(review_pages, list) or not review_pages or not all(isinstance(page, list) for page in review_pages):
             raise ValueError("review_pages_invalid")
