@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from fork_sync.jev import judge
+from fork_sync.gates import evaluate
 
 
 OPTIONS = ["no_additional_handling", "additional_handling", "insufficient_context"]
@@ -137,6 +138,79 @@ configureFetch(async (url, init) => {
         self.assertEqual(len(requests), 1)
         self.assertNotIn("test-secret", json.dumps(result))
 
+    def test_transport_preserves_choice_confidence_precision(self):
+        probabilities = dict(zip(OPTIONS, [0.968, 0.02, 0.012]))
+        result, requests = self.controlled_transport({"status": 200, "body": {
+            "model": "jev-1.13.0", "usage": {"input_tokens": 100, "output_tokens": 10},
+            "answers": {"additional_handling": {"type": "choice", "choice": OPTIONS[0],
+                "confidence": 0.968, "probabilities": probabilities}}}})
+        self.assertEqual(result.get("answer"), "no_additional_handling", result)
+        self.assertEqual(result["probabilities"], probabilities)
+        self.assertEqual(len(requests), 1)
+
+    def test_transport_preserves_probability_precision(self):
+        probabilities = dict(zip(OPTIONS, [0.98, 0.0102, 0.0098]))
+        result, requests = self.controlled_transport({"status": 200, "body": {
+            "model": "jev-1.13.0", "usage": {"input_tokens": 100, "output_tokens": 10},
+            "answers": {"additional_handling": {"type": "choice", "choice": OPTIONS[0],
+                "confidence": 0.98, "probabilities": probabilities}}}})
+        self.assertEqual(result.get("answer"), "no_additional_handling", result)
+        self.assertEqual(result["probabilities"], probabilities)
+        self.assertEqual(len(requests), 1)
+
+    def test_gate_uses_unrounded_transport_probability_at_threshold(self):
+        policy = {**self.policy, "sha256": self.candidate["policy_sha256"],
+                  "questions_sha256": self.candidate["questions_sha256"],
+                  "coderabbit_user_id": 136622811,
+                  "required_checks": [{"name": "sync-ci", "app_id": 15368}]}
+        observation = {
+            "binding": self.candidate.copy(), "live_base": self.candidate["base"],
+            "live_head": self.candidate["head"], "policy_sha256": policy["sha256"],
+            "questions_sha256": policy["questions_sha256"], "mergeability": "clean",
+            "unresolved_threads": 0, "protection": {"enforce_admins": True, "strict": True,
+                "required_checks": policy["required_checks"]},
+            "checks": [{"name": "sync-ci", "app_id": 15368, "head": self.candidate["head"],
+                        "status": "completed", "conclusion": "success"}],
+            "reviews": [{"id": 42, "user": "coderabbitai[bot]", "user_id": 136622811,
+                         "state": "APPROVED", "commit_id": self.candidate["head"],
+                         "submitted_at": "2026-10-07T20:00:00Z"}],
+        }
+        for values, expected in (([0.9599, 0.0201, 0.02], "hold"),
+                                 ([0.96, 0.02, 0.02], "ready"),
+                                 ([0.9601, 0.0199, 0.02], "ready")):
+            with self.subTest(values=values):
+                probabilities = dict(zip(OPTIONS, values))
+                result, requests = self.controlled_transport({"status": 200, "body": {
+                    "model": "jev-1.13.0", "usage": {"input_tokens": 100, "output_tokens": 10},
+                    "answers": {"additional_handling": {"type": "choice", "choice": OPTIONS[0],
+                        "confidence": values[0], "probabilities": probabilities}}}})
+                self.assertEqual(result.get("answer"), "no_additional_handling", result)
+                self.assertEqual(result["probabilities"], probabilities)
+                self.assertEqual(evaluate(self.candidate, {**observation, "jev": result}, policy)["status"], expected)
+                self.assertEqual(len(requests), 1)
+
+    def test_malformed_raw_transport_evidence_holds_after_one_request(self):
+        body = {"model": "jev-1.13.0", "usage": {"input_tokens": 100, "output_tokens": 10},
+                "answers": self.response["raw"][0]["answers"]}
+        variants = []
+        for field, value in (("type", "text"), ("choice", "other_option"),
+                             ("confidence", True), ("probabilities", {}),
+                             ("probabilities", dict(zip(OPTIONS, [0.98, 0.01, 0.02]))),
+                             ("probabilities", dict(zip(OPTIONS, [0.01, 0.98, 0.01])))):
+            variant = copy.deepcopy(body)
+            variant["answers"]["additional_handling"][field] = value
+            variants.append(variant)
+        variants.append({**body, "model": "jev-latest"})
+        extra = copy.deepcopy(body)
+        extra["answers"]["other_question"] = copy.deepcopy(extra["answers"]["additional_handling"])
+        variants.append(extra)
+        for index, variant in enumerate(variants):
+            with self.subTest(index=index):
+                result, requests = self.controlled_transport({"status": 200, "body": variant})
+                self.assertEqual(result, {"status": "hold", "reasons": ["jev_input_or_transport_error"]})
+                self.assertEqual(len(requests), 1)
+                self.assertNotIn("test-secret", json.dumps(result))
+
     def test_transport_failures_and_timeouts_hold_without_another_request(self):
         scenarios = [{"kind": "network"}, {"kind": "timeout-before-response"},
                      {"kind": "timeout-after-response"}, {"status": 408}, {"status": 429},
@@ -253,6 +327,12 @@ configureFetch(async (url, init) => {
         variants.append(extra)
         mismatch = copy.deepcopy(original)
         mismatch["answers"][0]["answer"] = "additional_handling"
+        variants.append(mismatch)
+        mismatch = copy.deepcopy(original)
+        mismatch["answers"][0]["confidence"] = 0.97
+        variants.append(mismatch)
+        mismatch = copy.deepcopy(original)
+        mismatch["distributions"]["additional_handling"][0]["p"] = 0.97
         variants.append(mismatch)
         for value in (True, float("nan"), -0.1, 1.1, 0.5, 10 ** 400):
             variant = copy.deepcopy(original)
