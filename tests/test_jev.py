@@ -4,6 +4,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -52,10 +54,10 @@ class JevTests(unittest.TestCase):
         return self.git("rev-parse", "HEAD")
 
     def fake_run(self, command, **kwargs):
-        if command[0] != "jev-axi":
+        if command[0] != "node":
             return self.real_run(command, **kwargs)
-        state_path = Path(command[command.index("--state") + 1])
-        questions_path = Path(command[command.index("--questions") + 1])
+        questions_path = Path(command[3])
+        state_path = Path(command[4])
         self.calls.append({"command": command, "kwargs": kwargs, "state": state_path.read_bytes(),
                            "questions": questions_path.read_bytes(), "mode": state_path.stat().st_mode & 0o777,
                            "path": state_path})
@@ -64,6 +66,121 @@ class JevTests(unittest.TestCase):
     def run_judge(self):
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "test-secret"}), patch("subprocess.run", side_effect=self.fake_run):
             return judge(self.repo, self.candidate, self.policy)
+
+    def controlled_transport(self, scenario):
+        """Run the production adapter and locked SDK with only HTTP and time controlled."""
+        cli = shutil.which("jev-axi")
+        node = shutil.which("node")
+        self.assertIsNotNone(cli, "Install tools/jev's locked dependencies and put their .bin on PATH")
+        self.assertIsNotNone(node, "Node is required for the locked Jev transport tests")
+        package = Path(cli).resolve().parents[2]
+        self.assertEqual(json.loads((package / "package.json").read_text())["version"], "0.7.2")
+        transport_directory = tempfile.TemporaryDirectory(prefix="transport-", dir=self.repo)
+        self.addCleanup(transport_directory.cleanup)
+        transport = Path(transport_directory.name)
+        (transport / "scenario.json").write_text(json.dumps(scenario))
+        log = transport / "requests.jsonl"
+        preload = transport / "fetch.mjs"
+        preload.write_text("""
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { configureFetch } from CLIENT;
+const scenario = JSON.parse(readFileSync(SCENARIO, 'utf8'));
+if (scenario.cached) {
+  const questions = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+  const state = JSON.parse(readFileSync(process.argv[4], 'utf8'));
+  const key = createHash('sha256').update(JSON.stringify({ model: process.argv[5], state, questions })).digest('hex');
+  const cache = process.env.XDG_CACHE_HOME + '/jev-axi';
+  mkdirSync(cache, { recursive: true });
+  writeFileSync(cache + '/' + key + '.json', JSON.stringify({ ...scenario.cached, created: Date.now() }));
+}
+const originalTimeout = globalThis.setTimeout;
+// Exercise the SDK's real abort timer without waiting its production 60 seconds.
+globalThis.setTimeout = (fn, ms, ...args) => originalTimeout(fn, ms === 60000 ? 5 : ms, ...args);
+configureFetch(async (url, init) => {
+  appendFileSync(LOG, JSON.stringify({ url, body: JSON.parse(init.body) }) + '\\n');
+  if (scenario.kind === 'network') throw new TypeError('test-secret connection failure');
+  if (scenario.kind === 'timeout-before-response') {
+    return await new Promise((_, reject) => init.signal.addEventListener('abort',
+      () => reject(new DOMException('test-secret', 'AbortError')), { once: true }));
+  }
+  if (scenario.kind === 'timeout-after-response') {
+    return new Response(new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"model":"jev-1.13.0",'));
+      init.signal.addEventListener('abort', () => controller.error(new DOMException('test-secret', 'AbortError')),
+        { once: true });
+    }}), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+  return new Response(JSON.stringify(scenario.body ?? { error: 'test-secret controlled failure' }), {
+    status: scenario.status, headers: { 'content-type': 'application/json', 'retry-after-ms': '0' }
+  });
+});
+""".replace("CLIENT", json.dumps((package / "dist/src/client.js").as_uri()))
+            .replace("SCENARIO", json.dumps(str(transport / "scenario.json")))
+            .replace("LOG", json.dumps(str(log))))
+        shim = transport / "node"
+        shim.write_text(f"#!/bin/sh\nexec {shlex.quote(node)} --import {shlex.quote(str(preload))} \"$@\"\n")
+        shim.chmod(0o700)
+        home = transport / "home"
+        home.mkdir()
+        environment = {"PATH": str(transport) + os.pathsep + os.environ["PATH"],
+                       "HOME": str(home), "XDG_CACHE_HOME": str(home / "cache"),
+                       "TYPESAFE_API_KEY": "test-secret"}
+        with patch.dict(os.environ, environment, clear=True):
+            result = judge(self.repo, self.candidate, self.policy)
+        requests = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+        return result, requests
+
+    def test_transport_503_holds_after_one_request(self):
+        result, requests = self.controlled_transport({"status": 503})
+        self.assertEqual(result, {"status": "hold", "reasons": ["jev_input_or_transport_error"]})
+        self.assertEqual(len(requests), 1)
+        self.assertNotIn("test-secret", json.dumps(result))
+
+    def test_transport_failures_and_timeouts_hold_without_another_request(self):
+        scenarios = [{"kind": "network"}, {"kind": "timeout-before-response"},
+                     {"kind": "timeout-after-response"}, {"status": 408}, {"status": 429},
+                     {"status": 500}, {"status": 529}]
+        for scenario in scenarios:
+            with self.subTest(scenario=scenario):
+                result, requests = self.controlled_transport(scenario)
+                self.assertEqual(result, {"status": "hold", "reasons": ["jev_input_or_transport_error"]})
+                self.assertEqual(len(requests), 1)
+                self.assertNotIn("test-secret", json.dumps(result))
+
+    def test_live_response_preserves_full_judgment_and_complete_inputs(self):
+        raw = self.response["raw"][0]
+        cached = {"model": raw["model"], "usage": {"input_tokens": 100, "output_tokens": 10},
+                  "answers": {"additional_handling": {"type": "choice", "choice": OPTIONS[1],
+                      "confidence": 0.98, "probabilities": dict(zip(OPTIONS, [0.01, 0.98, 0.01]))}}}
+        result, requests = self.controlled_transport({"status": 200, "body": {
+            "model": raw["model"], "answers": raw["answers"],
+            "usage": {"input_tokens": 100, "output_tokens": 10}}, "cached": cached})
+        self.assertEqual(result["answer"], "no_additional_handling", result)
+        self.assertEqual(result["probabilities"], dict(zip(OPTIONS, [0.98, 0.01, 0.01])))
+        self.assertIs(result["cached"], False)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(requests[0]["body"]["questions"], self.questions)
+        self.assertEqual(requests[0]["body"]["model"], "jev-1.13.0")
+        state = requests[0]["body"]["state"]
+        self.assertEqual(state["binding"], self.candidate)
+        self.assertEqual(state["fork_obligations"], self.policy["fork_obligations"])
+        self.assertIn("-Before", state["complete_upstream_diff"])
+        self.assertIn("+After", state["complete_upstream_diff"])
+        state_bytes = (json.dumps(state, indent=2, ensure_ascii=False) + "\n").encode()
+        self.assertEqual(result["state_sha256"], hashlib.sha256(state_bytes).hexdigest())
+
+    def test_negative_and_below_threshold_live_answers_are_not_resubmitted(self):
+        for choice, probabilities in ((OPTIONS[1], [0.01, 0.98, 0.01]),
+                                      (OPTIONS[0], [0.95, 0.03, 0.02])):
+            with self.subTest(choice=choice, probabilities=probabilities):
+                result, requests = self.controlled_transport({"status": 200, "body": {
+                    "model": "jev-1.13.0", "usage": {"input_tokens": 100, "output_tokens": 10},
+                    "answers": {"additional_handling": {"type": "choice", "choice": choice,
+                        "confidence": max(probabilities), "probabilities": dict(zip(OPTIONS, probabilities))}}}})
+                self.assertEqual(result["answer"], choice, result)
+                self.assertEqual(result["probabilities"], dict(zip(OPTIONS, probabilities)))
+                self.assertEqual(len(requests), 1)
 
     def test_observed_response_binds_complete_state_and_candidate(self):
         result = self.run_judge()
@@ -76,7 +193,7 @@ class JevTests(unittest.TestCase):
         self.assertIn(b"Preserve public upstream content.", call["state"])
         self.assertEqual(result["state_sha256"], hashlib.sha256(call["state"]).hexdigest())
         self.assertEqual(result["state_sha256"], result["observed_state_sha256"])
-        self.assertIn("--no-cache", call["command"])
+        self.assertEqual(call["command"][5], "jev-1.13.0")
         self.assertEqual(call["kwargs"]["timeout"], 75)
         self.assertEqual(call["mode"], 0o600)
         self.assertFalse(call["path"].exists())
@@ -93,11 +210,12 @@ class JevTests(unittest.TestCase):
     def test_judgment_cli_receives_no_forge_or_runner_credentials(self):
         with patch.dict(os.environ, {'GH_TOKEN': 'forge-write-secret',
                                      'GH_READ_TOKEN': 'forge-read-secret',
-                                     'ACTIONS_RUNTIME_TOKEN': 'runner-secret'}):
+                                     'ACTIONS_RUNTIME_TOKEN': 'runner-secret',
+                                     'NODE_OPTIONS': '--import untrusted-test-hook'}):
             self.assertEqual(self.run_judge()['answer'], 'no_additional_handling')
         environment = self.calls[0]['kwargs']['env']
         self.assertEqual(environment['TYPESAFE_API_KEY'], 'test-secret')
-        self.assertFalse({'GH_TOKEN', 'GH_READ_TOKEN', 'ACTIONS_RUNTIME_TOKEN'} & environment.keys())
+        self.assertFalse({'GH_TOKEN', 'GH_READ_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'NODE_OPTIONS'} & environment.keys())
 
     def test_binary_changes_hold_without_api_call(self):
         (self.repo / "image.bin").write_bytes(b"\x00\xff\x00")
@@ -157,7 +275,7 @@ class JevTests(unittest.TestCase):
                         OSError("test-secret")):
             attempts = []
             def fail(command, **kwargs):
-                if command[0] != "jev-axi":
+                if command[0] != "node":
                     return self.real_run(command, **kwargs)
                 attempts.append(command)
                 raise failure
@@ -179,7 +297,7 @@ class JevTests(unittest.TestCase):
     def test_duplicate_json_keys_hold(self):
         def duplicate(command, **kwargs):
             result = self.fake_run(command, **kwargs)
-            if command[0] == "jev-axi":
+            if command[0] == "node":
                 result.stdout = result.stdout.replace(b'"cached": false', b'"cached": true, "cached": false')
             return result
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "test-secret"}), patch("subprocess.run", side_effect=duplicate):

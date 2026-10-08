@@ -30,13 +30,14 @@ python3 -B -m fork_sync plan \
 
 The command returns a candidate, `noop`, or `hold`. A candidate identifies the base, upstream, merge commit, tree, and changed paths. `noop` means the upstream revision is already represented and the tree/ownership checks passed; it does not prove that a new update can traverse the hosted gates. A hold leaves publication for a later attempt after its cause is resolved.
 
-For reconciliation, inspect `python3 -m fork_sync --help` and the reviewed workflow's invocation together. Require the configured mode, controller revision, policy digest, helper pin, repository, and target branch to match the approved execution scope before dispatch. The hosted invocation is:
+For reconciliation, inspect `python3 -m fork_sync --help` and the reviewed workflow's invocation together. Require the configured mode, controller revision, policy digest, helper pin, repository, and target branch to match the approved execution scope before dispatch. Run from the approved controller checkout, which the hosted workflow places in `$GITHUB_WORKSPACE/controller`:
 
 ```sh
+cd "$GITHUB_WORKSPACE/controller"
 python3 -B -m fork_sync reconcile --phase prepare \
-  --repo "$GITHUB_WORKSPACE" \
+  --repo "$PWD" \
   --provingkit "$RUNNER_TEMP/provingkit" \
-  --evidence-dir "$RUNNER_TEMP/fork-sync-evidence"
+  --evidence-dir "$RUNNER_TEMP/sync-prepare"
 ```
 
 `FORK_SYNC_MODE` selects `off`, `validation`, or `production`. An active mode requires `FORK_SYNC_APPROVED_REVISION` to equal the clean executing controller checkout's commit. Policy selects `validation_branch` for validation and `target_branch` for production; the same raw policy must be present on the selected base. The published workflow and its actual `--help` output must agree before use. The command's off path can be checked without activation:
@@ -50,7 +51,7 @@ FORK_SYNC_MODE=off python3 -B -m fork_sync reconcile --repo "$SYNC_REPO"
 1. Verify source parity and ownership before publication. The candidate must contain exactly the selected upstream entries plus the unchanged admitted fork-owned entries.
 2. Publish one immutable candidate branch with Versionkeeping's reviewed plan and exact lease. A disposable repository materializes the candidate for the publication helpers; the executing controller checkout stays unchanged. Candidate content is data and is not executed. Mergecraft validates the generated PR body, publishes it as a draft, verifies live navigation and file anchors, and marks it ready. Existing candidate branches or PRs are reused only when their identities and authored content match; drift holds.
 3. Collect the configured successful checks for the current candidate, strict branch protection enforcing those checks for administrators, confirmed clean mergeability, no unresolved review threads, and CodeRabbit's current-commit approval. A skipped CodeRabbit content review is not itself an approval.
-4. Preparation returns `awaiting_judgment` and a digest of the candidate binding only after the preceding gates pass. A dedicated Actions job named `Jev <digest>` invokes the same command with `--phase finalize`. Finalization rechecks the candidate and hosted gates, verifies that this visible job is its first judgment attempt, and makes one uncached Jev request. Accept only the pinned answer and threshold below. Hold malformed, incomplete, stale, failed, oversized, binary, or otherwise unsupported input and responses.
+4. Preparation returns `awaiting_judgment` and a digest of the candidate binding only after the preceding gates pass. A dedicated Actions job named `Jev <digest>` invokes the same command with `--phase finalize`. Finalization rechecks the candidate and hosted gates, verifies that this visible job is its first judgment attempt, and makes one uncached Jev request with client retries disabled. Accept only the pinned answer and threshold below. Hold malformed, incomplete, stale, failed, oversized, binary, or otherwise unsupported input and responses.
 5. Reobserve the live base, head, checks, review, and protection before the merge attempt. The server's strict required checks remain necessary against concurrent base movement. Use the merge method that preserves ancestry and verify the resulting commit and parents. An uncertain write outcome requires observation; never retry it blindly.
 
 Runtime credentials belong in the approved environment and secret store. Checkout authentication must not leave repository-local credential settings that conflict with Versionkeeping. The adapter uses `GH_READ_TOKEN` for its read-only GitHub calls when supplied, `GH_TOKEN` for publication helpers, and `TYPESAFE_API_KEY` for Jev. The reviewed workflow owns their permissions and lifecycle. Do not place token values in arguments, files, PRs, or logs.
@@ -66,6 +67,8 @@ Workflow-wide concurrency has cancellation disabled. The workflow invokes finali
 Use `jev-1.13.0` and the exact approved `additional_handling` choice question in policy. Its three outcomes are `no_additional_handling`, `additional_handling`, and `insufficient_context`. Jev's gate passes only when its selected answer is `no_additional_handling` and that option's raw probability is at least **0.96**. Both other answers hold, as does a lower probability. The CLI's convenience confidence bands are not the acceptance rule.
 
 The state includes the complete bounded upstream diff and explicit fork obligations. Source text is material to assess, not instructions to follow. Bind the response to base, upstream, head, tree, policy digest, question digest, and submitted-state digest. Model, question, threshold, or relevant obligation changes require fresh qualification. Jev is an additional hold gate; it does not replace tree verification, authorization, CI, review, or branch protection.
+
+The repo-owned `tools/jev/judge.mjs` runner uses the locked Jev evaluator with `cache: false` and `maxRetries: 0`. A failed or timed-out transport holds without another request. The runner preserves the full structured response for the controller's validation; it does not change the approved question, model, or threshold. Response-cache bypass does not disable Jev's local alias and usage metadata writes.
 
 The retained corpus belongs in `docs/agents/qualification/`. The measured experiment accepted 8 of 8 ordinary development cases and held all 16 development cases expected to need handling or more context. On 23 untouched constructed validation cases, it accepted 5 of 7 ordinary cases and held all 16 cases expected to hold. The two unnecessary holds concerned archive compression and a calendar example. The separate real historical update passed at 0.98; its earlier probe was already known, so it was not blind validation.
 

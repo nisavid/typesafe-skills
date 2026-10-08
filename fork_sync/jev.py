@@ -5,6 +5,7 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -65,6 +66,10 @@ def _judge(repo, candidate, policy):
     state_bytes = _json_bytes(state)
     if len(state_bytes) > 64000:
         return {"status": "hold", "reasons": ["state_too_large"]}
+    cli = shutil.which("jev-axi")
+    if cli is None:
+        raise OSError("locked Jev dependency unavailable")
+    runner = Path(__file__).resolve().parent.parent / "tools/jev/judge.mjs"
     with tempfile.TemporaryDirectory(prefix="fork-sync-jev-") as directory:
         state_path = Path(directory) / "state.json"
         questions_path = Path(directory) / "questions.json"
@@ -73,8 +78,8 @@ def _judge(repo, candidate, policy):
                 os.chmod(path, 0o600)
                 stream.write(data)
         response = subprocess.run(
-            ["jev-axi", "ask", "--questions", str(questions_path), "--state", str(state_path),
-             "--model", policy["jev_model"], "--full", "--json", "--no-cache"],
+            ["node", str(runner), str(Path(cli).resolve()), str(questions_path),
+             str(state_path), policy["jev_model"]],
             check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=75,
             env={key: value for key, value in os.environ.items() if key in {
                 'PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL', 'XDG_CACHE_HOME', 'TYPESAFE_API_KEY'}},

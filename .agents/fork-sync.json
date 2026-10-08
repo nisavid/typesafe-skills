@@ -50,6 +50,7 @@
     "tests/test_jev.py",
     "tests/test_policy.py",
     "tests/test_publication.py",
+    "tools/jev/judge.mjs",
     "tools/jev/package-lock.json",
     "tools/jev/package.json"
   ],
