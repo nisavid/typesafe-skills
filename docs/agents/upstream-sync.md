@@ -11,7 +11,7 @@ Use an isolated checkout with complete Git objects and runtime credentials. Cand
 | Mode | Target and permitted result |
 | --- | --- |
 | `off` | Default. Reconciliation returns disabled without publication or merging. |
-| `validation` | The approved dedicated validation branch, initialized from the earlier real upstream release with the reviewed fork controls. Exercise a nonempty historical update and retain its evidence. |
+| `validation` | The approved dedicated validation branch, initialized from the earlier real upstream revision with the reviewed fork controls. Exercise a nonempty historical update and retain its evidence. |
 | `production` | The separately approved production branch. Scheduled reconciliation and manual dispatch use the same controller and gates. |
 
 Schedule execution may be delayed or skipped. It does not promise a run for every upstream push. Changing modes is an activation decision: a successful local plan, a published workflow, or a generic release of a task pause does not establish that the destination's settings and credentials have been approved and validated.
@@ -92,12 +92,29 @@ Prepare the following concrete settings for approval before the first hosted val
 | Mode | `FORK_SYNC_MODE=validation`; production remains a later decision. |
 | Attempt history | Pin the registered workflow ID in `FORK_SYNC_WORKFLOW_ID` and set `FORK_SYNC_FIRST_RUN_NUMBER=1`. Preserve its run history; missing history holds. |
 | Environment | Create `upstream-sync`, restrict eligible workflow branches, and approve its access policy before adding secrets. Required reviewers may gate initial validation. Unattended production needs a separately approved policy that permits unattended runs. |
-| Publication credential | `FORK_SYNC_TOKEN`: a `nisavid` fine-grained token limited to this repository, with Contents and Pull requests write. No Workflows write permission. |
-| Observation credential | `FORK_SYNC_READ_TOKEN`: repository-limited Contents, Pull requests, Checks, Actions, and Administration read access. Branch-protection observation needs an appropriate permission; a read-only job token alone is insufficient. |
+| App registration | Operator-owned GitHub App installed only on `nisavid/typesafe-skills`. Contents and Pull requests write; Checks, Actions, and Administration read; required Metadata read. No Workflows write, organization permissions, or protection bypass. Webhooks are disabled; scheduling remains in Actions. |
+| App identity | In `upstream-sync`, set `FORK_SYNC_APP_CLIENT_ID`, `FORK_SYNC_APP_INSTALLATION_ID`, and `FORK_SYNC_APP_SLUG` from the approved registration and installation. Both token actions must report that installation ID and slug before the controller runs. |
+| App private key | Store `FORK_SYNC_APP_PRIVATE_KEY` only in the approved environment. The pinned token action consumes it; controller and Jev process environments do not receive it. The key grants the App's full installed authority, so expanding installation access requires a separate decision. |
+| Publication credential | Each job generates a repository-limited installation token with Contents and Pull requests write, supplied to publication as `GH_TOKEN`. |
+| Observation credential | Each job generates a separate repository-limited installation token with Contents, Pull requests, Checks, Actions, and Administration read, supplied as `GH_READ_TOKEN`. Branch-protection observation requires Administration read. |
 | Judgment credential | `TYPESAFE_API_KEY`, available only to the finalization command. Jev's subprocess receives its own key without forge or runner credentials. |
 | Target protection | Require `sync-ci` from GitHub Actions, strict up-to-date checks, and enforcement for administrators. Permit ancestry-preserving merge commits. Verify the live rule before running. |
 
-The validation branch must contain the earlier real upstream release plus the same reviewed fork-owned files as the controller. Do not rewind main. The workflow must be registered on the default branch for manual dispatch; installing inert controls on main is part of the separately reviewed publication/activation sequence. Record every actual revision rather than treating the older CodeRabbit trial branch as the current validation fixture.
+### Provision and validate App authentication
+
+Create the registration and installation only after approval of the concrete access request. Record the App client ID, numeric App ID, slug, installation ID, selected repository, granted permissions, and bot login. Verify the environment remains restricted to `main`, its reviewer requirement matches the approved validation plan, and sync is `off` before saving the private key. Keep credential values out of chat, commands, files in this repository, and retained evidence.
+
+The GitHub actor for publication and merges is `<app-slug>[bot]`; the operator explicitly authorizes that actor for this workflow. Candidate commits retain the configured Git author and committer identity, `Ivan D Vasin <ivan@nisavid.io>`; App authentication does not change Git authorship or provide commit signing. Upstream authorship and ancestry remain preserved.
+
+The runner supplies Git publication authentication through the in-memory Git credential cache, using one explicit socket under `$RUNNER_TEMP/sync-git-credentials`, with a 20-minute lifetime and an always-run shutdown of that socket. This binding remains the same when the helper removes `XDG_CACHE_HOME` from Git subprocesses. The pinned Versionkeeping helper removes token environment variables before invoking Git, so `gh auth setup-git` alone is insufficient on a fresh runner. The cache receives the publication token through standard input; it does not store the token in a file. This cache is shared by processes of the runner user and is not a sandbox boundary.
+
+Dependency installation finishes before token generation. Tokens are issued separately in each job, expire after one hour, and the pinned action attempts revocation when the job ends. Keep its default revocation enabled. Both tokens are available to the trusted controller process; this is permission separation, not process isolation. A failed issuance or installation/slug mismatch stops before controller execution. After token expiry, cancellation, or an uncertain write, reobserve the existing candidate and attempt history before any recovery; issuance of a fresh token does not authorize another Jev sample or a repeated write.
+
+The first hosted validation must show the App-authored PR, CI triggered by that PR, normal CodeRabbit approval of its current commit, successful observation of protected-branch settings, and the authenticated merge actor. Verify token cleanup in the job's post steps. Missing evidence holds qualification. A local test using controlled GitHub responses does not prove installation permissions or bot-review behavior.
+
+Keep the App private key confined to the TypeSafe validation environment. Other forks need their own reviewed access and qualification. Before sharing one App across repositories, decide how its private key is isolated: separate Apps or a protected issuer that grants bounded tokens. The controller's read/publication interfaces accept runtime tokens; reuse elsewhere does not require personal tokens or these environment variable names.
+
+The validation branch must contain the earlier real upstream revision plus the same reviewed fork-owned files as the controller. Do not rewind main. The workflow must be registered on the default branch for manual dispatch; installing inert controls on main is part of the separately reviewed publication/activation sequence. Record every actual revision rather than treating the older CodeRabbit trial branch as the current validation fixture.
 
 Run whole-command tests against disposable repositories and controlled hosted responses, focused tests for intricate gate rules, and the real hosted historical update. Local fixtures and actual helper tests with a fake GitHub executable establish their stated local contracts only.
 
