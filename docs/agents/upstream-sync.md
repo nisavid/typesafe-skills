@@ -62,6 +62,8 @@ Publication receipts remain private to the runner. An ephemeral run can establis
 
 The attempt guard reads the pinned workflow's complete run and job history, including rerun attempts. `FORK_SYNC_WORKFLOW_ID` and `FORK_SYNC_FIRST_RUN_NUMBER` are approved activation settings; the initial run boundary is 1. Any previous non-skipped job for the same binding consumes the attempt, including a timeout, cancellation, negative judgment, or accepted judgment followed by a failed merge. Deleted, expired, missing, or inconsistent history holds. Do not move the boundary forward or recreate the workflow to bypass a hold. A maintainer must review recovery; this first version does not automatically reuse a prior judgment or retry it. Artifact expiry never permits another sample.
 
+Per-run history reads use at most four workers, each reading one run and its attempts in sequence. Permission requires every eligible run and rerun to pass the complete history and snapshot checks; concurrency adds no history cutoff or retry. This reduces the serial wait but leaves total API volume growing with retained history and reruns. Rate limits, expired history, and the finalization job's 20-minute timeout can still prevent completion. A caught unavailable read holds; a runner timeout can terminate the job before it returns a hold. Neither outcome permits another sample.
+
 Workflow-wide concurrency has cancellation disabled. The workflow invokes finalization only once in the bound job. Manually calling finalization again inside that same running job would not create another Actions attempt record and is outside the supported execution procedure.
 
 ## Apply the Jev rule

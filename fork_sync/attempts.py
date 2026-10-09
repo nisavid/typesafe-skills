@@ -11,6 +11,7 @@ import json
 import os
 import re
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 _FIELDS = ("base", "upstream", "head", "tree", "policy_sha256", "questions_sha256")
@@ -100,8 +101,8 @@ def permit(candidate: dict, policy: dict) -> dict:
         for run in runs:
             if run["id"] == run_id and any(run[key] != current[key] for key in ("run_attempt", "run_number", "status")):
                 raise ValueError("current_run_changed")
-            if run["run_number"] < first:
-                continue
+
+        def consumed(run):
             all_jobs = _records(f"{prefix}/runs/{run['id']}/jobs?filter=all&per_page=100", "jobs")
             attempt_jobs = []
             for number in range(1, run["run_attempt"] + 1):
@@ -124,7 +125,13 @@ def permit(candidate: dict, policy: dict) -> dict:
                 if previous["id"] == job["id"] and run["id"] == run_id:
                     continue
                 if previous["name"] == name and not (previous["status"] == "completed" and previous["conclusion"] == "skipped"):
-                    return {"status": "hold", "reasons": ["jev_attempt_consumed"]}
+                    return True
+            return False
+
+        with ThreadPoolExecutor(max_workers=4) as history:
+            consumed_attempts = list(history.map(consumed, (run for run in runs if run["run_number"] >= first)))
+        if any(consumed_attempts):
+            return {"status": "hold", "reasons": ["jev_attempt_consumed"]}
         return {"status": "permitted", "reasons": []}
     except (KeyError, TypeError, ValueError, OSError, subprocess.TimeoutExpired):
         return {"status": "hold", "reasons": ["jev_attempt_unconfirmed"]}
