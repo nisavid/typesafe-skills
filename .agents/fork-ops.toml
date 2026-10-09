@@ -1,0 +1,70 @@
+schema_version = "0.1"
+release_channels = []
+
+[repository]
+host = "github"
+owner = "nisavid"
+name = "typesafe-skills"
+default_branch = "main"
+
+[authority]
+source_order = ["explicit-user-direction", "AGENTS.md", ".agents/fork-ops.toml", "docs/agents", "current-upstream-source-and-docs", "source-and-test-inference"]
+upstream_canon = "Upstream owns the mirrored product files. Preserve their exact bytes; fork-local policy owns only explicitly approved additions."
+inference_labeling = "Label material inferences separately from observed facts."
+required_context_paths = ["AGENTS.md", "docs/agents/issue-tracker.md"]
+escalation_policy = "Ask Ivan when a consequential policy or authority choice remains unresolved."
+
+[change_targets]
+default = "fork"
+upstream_contribution = "explicit-only"
+upstream_issues = "explicit-only"
+
+[[fork_remotes]]
+name = "origin"
+owner = "nisavid"
+url = "https://github.com/nisavid/typesafe-skills"
+push = true
+purpose = "Maintained fork"
+
+[[upstreams]]
+id = "typesafe"
+owner = "typesafe-ai"
+name = "skills"
+remote = "upstream"
+url = "https://github.com/typesafe-ai/skills.git"
+default_branch = "main"
+push = false
+
+[[upstream_tracks]]
+id = "main"
+upstream = "typesafe"
+ref = "refs/remotes/upstream/main"
+source_type = "upstream_ref"
+source = "refs/heads/main"
+role = "Observed upstream branch"
+sync_eligible = false
+notes = "Sync eligibility and automation remain subject to the reviewed policy decision."
+
+[[local_surfaces]]
+kind = "agent_instruction"
+path = "AGENTS.md"
+
+[[local_surfaces]]
+kind = "config"
+path = ".agents/fork-ops.toml"
+
+[[local_surfaces]]
+kind = "config"
+path = ".coderabbit.yaml"
+
+[[local_surfaces]]
+kind = "doc"
+path = "docs/agents/issue-tracker.md"
+
+[[local_surfaces]]
+kind = "doc"
+path = "docs/agents/triage-labels.md"
+
+[[local_surfaces]]
+kind = "doc"
+path = "docs/agents/domain.md"
