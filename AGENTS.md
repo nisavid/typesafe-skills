@@ -16,6 +16,8 @@ CodeRabbit reviews fork-owned changes and uses normal automatic approval. Do not
 
 Track sync policy and qualification through the Wayfinder map, “Qualify deterministic upstream sync for TypeSafe skills”: https://github.com/nisavid/typesafe-skills/issues/1. Use its child issues and native dependencies to claim work and identify prerequisites. A workflow, fixture, or no-op result does not establish a successful real sync.
 
+The approved upstream-sync GitHub App may publish candidate branches and PRs and merge qualified sync PRs as its bot identity. This exception applies only to the reviewed sync workflow and its admitted repository. Local agent mutations continue through `nisavid`. Read `docs/agents/upstream-sync.md` for App provisioning, identity verification, and credential handling.
+
 ## Development and publication
 
 Use the standing skills that fit the work: `grilling` with `domain-modeling` for unresolved decisions, `tdd` for implementation, and `capturing-agent-procedures` for reusable methods. Read tracking instructions before ticket operations.
