@@ -123,7 +123,12 @@ def evaluate(candidate: dict, observation: dict, policy: dict) -> dict:
         return {"status": "hold", "reasons": ["protection_missing"]}
     protected = _check_keys(protection.get("required_checks"))
     if (protection.get("enforce_admins") is not True or protection.get("strict") is not True
-            or protected is None or not set(required).issubset(protected)):
+            or protected is None or not set(required).issubset(protected)
+            or type(protection.get("required_approving_review_count")) is not int
+            or protection["required_approving_review_count"] < 1
+            or protection.get("dismiss_stale_reviews") is not True
+            or protection.get("required_conversation_resolution") is not True
+            or protection.get("review_bypass_allowances") != {"users": [], "teams": [], "apps": []}):
         return {"status": "hold", "reasons": ["protection_inadequate"]}
     if observation.get("mergeability") != "clean":
         return {"status": "hold", "reasons": ["mergeability_unconfirmed"]}

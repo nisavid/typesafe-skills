@@ -118,6 +118,9 @@ def observe(repository: str, pr_number: int, target_branch: str,
                 threads.append(node)
         protection = _api(f"{prefix}/branches/{quote(target_branch, safe='')}/protection")
         required = protection["required_status_checks"]
+        review_protection = protection["required_pull_request_reviews"]
+        if not isinstance(review_protection, dict):
+            raise ValueError("review_protection_invalid")
         return {
             "binding": {"base": base, "head": head, "upstream": candidate["upstream"], "tree": tree,
                         "policy_sha256": policy_sha, "questions_sha256": questions_sha},
@@ -128,6 +131,11 @@ def observe(repository: str, pr_number: int, target_branch: str,
             "checks": checks, "reviews": reviews,
             "protection": {"enforce_admins": protection["enforce_admins"]["enabled"],
                            "strict": required["strict"],
+                           "required_approving_review_count": review_protection["required_approving_review_count"],
+                           "dismiss_stale_reviews": review_protection["dismiss_stale_reviews"],
+                           "required_conversation_resolution": protection["required_conversation_resolution"]["enabled"],
+                           "review_bypass_allowances": review_protection.get(
+                               "bypass_pull_request_allowances", {"users": [], "teams": [], "apps": []}),
                            "required_checks": [{"name": item["context"], "app_id": item["app_id"]}
                                                for item in required["checks"]]},
         }
@@ -147,8 +155,10 @@ def _identity(pr, repository, pr_number, target_branch, candidate, policy):
 def merge(repository: str, pr_number: int, candidate: dict, policy: dict) -> dict:
     """Merge after caller qualification; never retry an ambiguous write.
 
-The caller must run gates.evaluate on fresh observations first. Strict server
-    protection closes the race after this function's final base/head observation.
+    The caller must run gates.evaluate on fresh observations first. Strict server
+    protection enforces required checks, reviews, and conversation resolution
+    at merge time. Its review minimum is generic; it does not make the caller's
+    CodeRabbit-specific approval observation atomic with the merge.
     """
     if not _address_valid(repository, pr_number) or not _candidate_valid(candidate) or not os.environ.get("GH_TOKEN"):
         return {"status": "hold", "reason": "merge_preflight_failed"}

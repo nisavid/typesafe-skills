@@ -43,7 +43,11 @@ def fixture():
             "nodes": [{"isResolved": True}],
             "pageInfo": {"hasNextPage": False, "endCursor": None}}}}}}],
         "repos/owner/fork/branches/main/protection": {
-            "enforce_admins": {"enabled": True}, "required_status_checks": {
+            "enforce_admins": {"enabled": True},
+            "required_pull_request_reviews": {"required_approving_review_count": 1,
+                                              "dismiss_stale_reviews": True},
+            "required_conversation_resolution": {"enabled": True},
+            "required_status_checks": {
                 "strict": True, "checks": [{"context": "sync-ci", "app_id": 15368}]}},
         "repos/owner/fork/pulls/9/merge": {"merged": True, "sha": MERGED},
         f"repos/owner/fork/git/commits/{MERGED}": {
@@ -83,6 +87,53 @@ class GitHubTests(unittest.TestCase):
             "state_sha256": "1" * 64, "observed_state_sha256": "1" * 64,
         }
         return evaluate(candidate, observation, policy)
+
+    def test_review_protection_from_github_preserves_server_enforcement(self):
+        for explicit_empty_bypass in (False, True):
+            with self.subTest(explicit_empty_bypass=explicit_empty_bypass):
+                candidate, policy, routes = fixture()
+                if explicit_empty_bypass:
+                    routes["repos/owner/fork/branches/main/protection"]["required_pull_request_reviews"][
+                        "bypass_pull_request_allowances"] = {"users": [], "teams": [], "apps": []}
+                self.assertEqual(self.evaluate_routes(candidate, policy, routes),
+                                 {"status": "ready", "reasons": []})
+
+    def test_missing_malformed_or_weakened_github_review_protection_holds(self):
+        variants = [
+            {"required_pull_request_reviews": value}
+            for value in (None, {}, [], True)
+        ]
+        for field, values in {
+            "required_approving_review_count": (None, 0, -1, True, 1.0, "1"),
+            "dismiss_stale_reviews": (None, False, 1, "true"),
+            "bypass_pull_request_allowances": (None, {}, [], False,
+                {"users": [{"id": 123}], "teams": [], "apps": []},
+                {"users": [], "teams": [{"id": 123}], "apps": []},
+                {"users": [], "teams": [], "apps": [{"id": 123}]},
+                {"users": [], "teams": []},
+                {"users": [], "teams": [], "apps": None}),
+        }.items():
+            for value in values:
+                variants.append({"required_pull_request_reviews": {
+                    "required_approving_review_count": 1, "dismiss_stale_reviews": True,
+                    field: value}})
+        for value in (None, {}, [], True, {"enabled": False}, {"enabled": 1}, {"enabled": "true"}):
+            variants.append({"required_conversation_resolution": value})
+        for mutation in variants:
+            with self.subTest(mutation=mutation):
+                candidate, policy, routes = fixture()
+                routes["repos/owner/fork/branches/main/protection"].update(mutation)
+                self.assertEqual(self.evaluate_routes(candidate, policy, routes)["status"], "hold")
+        for field in ("required_pull_request_reviews", "required_conversation_resolution"):
+            with self.subTest(missing=field):
+                candidate, policy, routes = fixture()
+                del routes["repos/owner/fork/branches/main/protection"][field]
+                self.assertEqual(self.evaluate_routes(candidate, policy, routes)["status"], "hold")
+        for field in ("required_approving_review_count", "dismiss_stale_reviews"):
+            with self.subTest(missing=field):
+                candidate, policy, routes = fixture()
+                del routes["repos/owner/fork/branches/main/protection"]["required_pull_request_reviews"][field]
+                self.assertEqual(self.evaluate_routes(candidate, policy, routes)["status"], "hold")
 
     def test_identical_successful_suites_on_one_page_allow_readiness(self):
         candidate, policy, routes = fixture()
