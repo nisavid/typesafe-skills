@@ -1,0 +1,913 @@
+[
+  {
+    "id": "development-spelling",
+    "split": "development",
+    "family": "spelling",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "Keep fork onboarding readable in English; no fork instructions depend on this sentence verbatim."
+      ],
+      "relevant_context": "The fork publishes the upstream README directly.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/README.md w/README.md\nindex d915836..7ff1216 100644\n--- i/README.md\n+++ w/README.md\n@@ -1 +1 @@\n-Configure the clent before sending requests.\n+Configure the client before sending requests.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "Spelling correction preserves the onboarding obligation."
+  },
+  {
+    "id": "development-example-variable",
+    "split": "development",
+    "family": "example-variable",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "Examples must remain self-contained JavaScript snippets."
+      ],
+      "relevant_context": "The demonstrated call and returned value are unchanged.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/example.md w/docs/example.md\nindex c80ea5c..a079d86 100644\n--- i/docs/example.md\n+++ w/docs/example.md\n@@ -1,2 +1,2 @@\n-const response = await client.call(input);\n-console.log(response);\n+const result = await client.call(input);\n+console.log(result);\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "Both declarations and uses change together without a fork-specific adaptation."
+  },
+  {
+    "id": "development-markdown-format",
+    "split": "development",
+    "family": "markdown-format",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "Preserve readable plain Markdown in the fork help page."
+      ],
+      "relevant_context": "The help renderer supports paragraphs and unordered lists.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/usage.md w/docs/usage.md\nindex e9dbeb0..d0fe6c3 100644\n--- i/docs/usage.md\n+++ w/docs/usage.md\n@@ -1 +1,4 @@\n-Options: fast, balanced, careful.\n+Options:\n+- fast\n+- balanced\n+- careful\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "The supported renderer displays the same options."
+  },
+  {
+    "id": "development-additive-glossary",
+    "split": "development",
+    "family": "additive-glossary",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "Retain the existing definition of State in the fork glossary."
+      ],
+      "relevant_context": "No local consumer treats glossary entries as a closed set.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/glossary.md w/docs/glossary.md\nindex 323a00a..ff72cf0 100644\n--- i/docs/glossary.md\n+++ w/docs/glossary.md\n@@ -1 +1,2 @@\n State: the text supplied for judgment.\n+Choice: a selection from named alternatives.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "An additive independent definition preserves the existing definition."
+  },
+  {
+    "id": "development-optional-editor",
+    "split": "development",
+    "family": "optional-editor",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "Contributors must be able to use a terminal-only editor."
+      ],
+      "relevant_context": "The preview suggestion is optional; no build step requires an editor.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/authoring.md w/docs/authoring.md\nindex 6bfb55c..ca09a16 100644\n--- i/docs/authoring.md\n+++ w/docs/authoring.md\n@@ -1 +1 @@\n-Write Markdown with any text editor.\n+Write Markdown with any text editor. An editor preview can optionally help inspect tables.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "The terminal-only authoring path remains supported."
+  },
+  {
+    "id": "development-inactive-link",
+    "split": "development",
+    "family": "inactive-link",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "Keep request syntax available in the bundled API guide."
+      ],
+      "relevant_context": "The unchanged bundled API guide contains full request syntax. The new essay is not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/README.md w/README.md\nindex 4e0d147..30f925f 100644\n--- i/README.md\n+++ w/README.md\n@@ -1 +1 @@\n-See the API guide for request syntax.\n+See the API guide for request syntax. A background essay is available at https://example.invalid/essay.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "The absent optional essay is not needed to establish the stated obligation."
+  },
+  {
+    "id": "development-scoped-deprecation",
+    "split": "development",
+    "family": "scoped-deprecation",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork tutorial must keep using a documented command."
+      ],
+      "relevant_context": "The fork tutorial uses `send` exclusively.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/commands.md w/docs/commands.md\nindex 0855f28..3ca3647 100644\n--- i/docs/commands.md\n+++ w/docs/commands.md\n@@ -1 +1 @@\n-Use `send` for requests. The old `legacy-send` alias also works.\n+Use `send` for requests. The old `legacy-send` alias is deprecated.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "Only an unused legacy alias is deprecated."
+  },
+  {
+    "id": "development-wording-equivalence",
+    "split": "development",
+    "family": "wording-equivalence",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork runbook promises at most two retries after the initial request."
+      ],
+      "relevant_context": "The service operation is otherwise unchanged.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/retry.md w/docs/retry.md\nindex 08e4721..fe6f435 100644\n--- i/docs/retry.md\n+++ w/docs/retry.md\n@@ -1 +1 @@\n-After a timeout, make no more than two additional attempts.\n+After a timeout, retry at most twice.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "The revised wording preserves the same retry limit."
+  },
+  {
+    "id": "development-renamed-command",
+    "split": "development",
+    "family": "renamed-command",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The maintained fork runbook must name the supported catalog update command."
+      ],
+      "relevant_context": "The fork runbook currently tells operators to run `sync-now`. It is outside the upstream diff.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/commands.md w/docs/commands.md\nindex d09cb6a..2a0bee2 100644\n--- i/docs/commands.md\n+++ w/docs/commands.md\n@@ -1 +1 @@\n-Run `sync-now` to update the catalog.\n+Run `catalog-refresh` to update the catalog. `sync-now` is no longer supported.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The fork runbook needs revision even while upstream bytes remain unchanged."
+  },
+  {
+    "id": "development-renderer-feature",
+    "split": "development",
+    "family": "renderer-feature",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "Published fork help must show the mode meanings with its static Markdown renderer."
+      ],
+      "relevant_context": "The fork renderer strips unknown component tags and has no InteractiveTable component.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/table.md w/docs/table.md\nindex 76f67ad..b6dd1fd 100644\n--- i/docs/table.md\n+++ w/docs/table.md\n@@ -1,3 +1 @@\n-| Name | Meaning |\n-| --- | --- |\n-| fast | Quick check |\n+<InteractiveTable data=\"modes\" />\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The new upstream presentation does not meet the local renderer obligation."
+  },
+  {
+    "id": "development-required-editor",
+    "split": "development",
+    "family": "required-editor",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "Maintain a supported terminal-only contribution path for fork contributors."
+      ],
+      "relevant_context": "The fork contributors use terminal editors without a graphical session.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/authoring.md w/docs/authoring.md\nindex 86e7f09..509e34b 100644\n--- i/docs/authoring.md\n+++ w/docs/authoring.md\n@@ -1 +1 @@\n-Any text editor can edit the source.\n+To edit the source, use the graphical Studio editor; handwritten source edits are unsupported.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The contribution process now conflicts with the provided fork obligation."
+  },
+  {
+    "id": "development-locale-policy",
+    "split": "development",
+    "family": "locale-policy",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork onboarding must provide English default messages."
+      ],
+      "relevant_context": "The fork currently republishes upstream default messages without translation.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/messages.md w/docs/messages.md\nindex b0dc35a..32fc350 100644\n--- i/docs/messages.md\n+++ w/docs/messages.md\n@@ -1 +1 @@\n-Default messages use English.\n+Default messages use French; English translations are no longer shipped.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The default language change requires a local handling decision."
+  },
+  {
+    "id": "development-platform-floor",
+    "split": "development",
+    "family": "platform-floor",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork quickstart must remain supported on the documented Python 3.11 training environment."
+      ],
+      "relevant_context": "The training environment cannot be upgraded by this sync.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/install.md w/docs/install.md\nindex eb461bf..3098127 100644\n--- i/docs/install.md\n+++ w/docs/install.md\n@@ -1 +1 @@\n-Supported Python versions start at 3.10.\n+Supported Python versions start at 3.13.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The revised supported versions exclude the fixed local environment."
+  },
+  {
+    "id": "development-removed-output",
+    "split": "development",
+    "family": "removed-output",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The maintained fork report template must display the explanation returned by the tool."
+      ],
+      "relevant_context": "The fork template reads the explanation field; no substitute is described.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/output.md w/docs/output.md\nindex 6361e21..540ffb3 100644\n--- i/docs/output.md\n+++ w/docs/output.md\n@@ -1 +1 @@\n-The report includes title, status, and explanation.\n+The report includes title and status. The explanation field has been removed.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The local template requires adaptation to the removed field."
+  },
+  {
+    "id": "development-example-credential",
+    "split": "development",
+    "family": "example-credential",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork training material must tell trainees to keep API keys out of committed source."
+      ],
+      "relevant_context": "This quickstart is included directly in the fork training material.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/quickstart.md w/docs/quickstart.md\nindex 34d7bc1..03c6ed7 100644\n--- i/docs/quickstart.md\n+++ w/docs/quickstart.md\n@@ -1 +1 @@\n-Read the API key from an environment variable.\n+Paste your API key into the source-code example before committing the example.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The new instructions contradict the supplied training requirement; this label is not a security certification."
+  },
+  {
+    "id": "development-deadline-policy",
+    "split": "development",
+    "family": "deadline-policy",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork support guide must accurately describe the upstream ticket submission period."
+      ],
+      "relevant_context": "The separate fork guide currently promises thirty days.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/support.md w/docs/support.md\nindex 2ffcc33..95999f6 100644\n--- i/docs/support.md\n+++ w/docs/support.md\n@@ -1 +1 @@\n-Support tickets may be submitted within thirty days.\n+Support tickets must be submitted within seven days.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The local support guide becomes inaccurate and needs handling."
+  },
+  {
+    "id": "development-missing-migration",
+    "split": "development",
+    "family": "missing-migration",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The maintained fork script must remain compatible with the documented command interface."
+      ],
+      "relevant_context": "The fork script uses version 1. The referenced migration document and command mapping are absent from the supplied context.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/commands.md w/docs/commands.md\nindex 22409a1..542a4d1 100644\n--- i/docs/commands.md\n+++ w/docs/commands.md\n@@ -1 +1 @@\n-The documented command interface is version 1.\n+The command interface is version 2. Existing scripts must follow docs/migration-v2.md.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The required migration details are missing for the specific local script obligation."
+  },
+  {
+    "id": "development-unknown-renderer",
+    "split": "development",
+    "family": "unknown-renderer",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork help page must display the architecture description."
+      ],
+      "relevant_context": "The fork help renderer capabilities are not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/diagrams.md w/docs/diagrams.md\nindex a08d594..e5302bb 100644\n--- i/docs/diagrams.md\n+++ w/docs/diagrams.md\n@@ -1 +1 @@\n-Architecture is described in plain text.\n+Architecture is shown in a Mermaid diagram.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "Whether the new format satisfies the local display obligation depends on missing renderer capabilities."
+  },
+  {
+    "id": "development-unknown-python",
+    "split": "development",
+    "family": "unknown-python",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork onboarding must support the deployed training environment."
+      ],
+      "relevant_context": "The deployed Python version is not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/install.md w/docs/install.md\nindex eb461bf..9e4cbff 100644\n--- i/docs/install.md\n+++ w/docs/install.md\n@@ -1 +1 @@\n-Supported Python versions start at 3.10.\n+Supported Python versions start at 3.12.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The compatibility comparison cannot be completed without the environment version."
+  },
+  {
+    "id": "development-missing-schema",
+    "split": "development",
+    "family": "missing-schema",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork parser must correctly read the generated reports."
+      ],
+      "relevant_context": "The fork parser reads status and summary. The revised schema is not included.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/output.md w/docs/output.md\nindex 8b3ab83..0722a56 100644\n--- i/docs/output.md\n+++ w/docs/output.md\n@@ -1 +1 @@\n-Reports use the original schema.\n+Reports use the revised schema documented at https://example.invalid/report-v2.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "Required fields and formats may have changed; the relevant schema is missing."
+  },
+  {
+    "id": "development-unknown-locale",
+    "split": "development",
+    "family": "unknown-locale",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork training material must use the language assigned to its current cohort."
+      ],
+      "relevant_context": "The current cohort language is not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/messages.md w/docs/messages.md\nindex b0dc35a..7807f7a 100644\n--- i/docs/messages.md\n+++ w/docs/messages.md\n@@ -1 +1 @@\n-Default messages use English.\n+Default messages use Spanish.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The obligation is known but its required language is missing."
+  },
+  {
+    "id": "development-missing-support-terms",
+    "split": "development",
+    "family": "missing-support-terms",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork support guide must accurately describe the submission period for its education installation."
+      ],
+      "relevant_context": "The education terms are not supplied. The local guide currently says thirty days.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/support.md w/docs/support.md\nindex f2d2744..121fe75 100644\n--- i/docs/support.md\n+++ w/docs/support.md\n@@ -1 +1 @@\n-All installations use standard support terms.\n+Education installations use the terms at https://example.invalid/education-support.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The new submission period is needed to evaluate the local guide."
+  },
+  {
+    "id": "development-partial-example",
+    "split": "development",
+    "family": "partial-example",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork lesson must contain a runnable self-contained request example."
+      ],
+      "relevant_context": "Only this changed line is supplied. The surrounding example and definition of mode are unavailable.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/example.md w/docs/example.md\nindex 7afd706..ca7e080 100644\n--- i/docs/example.md\n+++ w/docs/example.md\n@@ -1 +1 @@\n-Call send_request(payload).\n+Call make_request(payload, mode).\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The new argument may or may not be defined in omitted required context."
+  },
+  {
+    "id": "development-unknown-return-policy",
+    "split": "development",
+    "family": "unknown-return-policy",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork operator guide must state exactly when retries occur."
+      ],
+      "relevant_context": "The fork operator guide text is not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/retry.md w/docs/retry.md\nindex 6390ade..f07d619 100644\n--- i/docs/retry.md\n+++ w/docs/retry.md\n@@ -1 +1 @@\n-The client retries on timeout.\n+The client also retries when a response body is empty.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "Need the guide content to determine whether it already covers the new retry condition."
+  },
+  {
+    "id": "heldout-version-display",
+    "split": "heldout",
+    "family": "version-display",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork about page must display the version reported by upstream documentation."
+      ],
+      "relevant_context": "The fork publishes this file directly and has no separately stored version string.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/about.md w/docs/about.md\nindex 4730585..a822699 100644\n--- i/docs/about.md\n+++ w/docs/about.md\n@@ -1 +1 @@\n-Current release: 4.2.0.\n+Current release: 4.2.1.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "Direct mirroring updates the displayed version consistently."
+  },
+  {
+    "id": "heldout-optional-plugin",
+    "split": "heldout",
+    "family": "optional-plugin",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork installation must remain usable without export plugins."
+      ],
+      "relevant_context": "The plugin is explicitly optional and the core path is unchanged.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/plugins.md w/docs/plugins.md\nindex c713365..35b4a94 100644\n--- i/docs/plugins.md\n+++ w/docs/plugins.md\n@@ -1 +1 @@\n-The core runs without plugins.\n+The core runs without plugins. An optional CSV export plugin is available.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "An optional plugin does not require a fork install change."
+  },
+  {
+    "id": "heldout-diagnostic-detail",
+    "split": "heldout",
+    "family": "diagnostic-detail",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork alert handler must continue receiving an error for failed requests."
+      ],
+      "relevant_context": "The handler tests the error category and ignores explanatory text.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/errors.md w/docs/errors.md\nindex 0a480d6..82b172e 100644\n--- i/docs/errors.md\n+++ w/docs/errors.md\n@@ -1 +1 @@\n-When a request fails, the client returns an error.\n+When a request fails, the client returns an error with a human-readable explanation.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "Additional explanatory text leaves the relevant error behavior intact."
+  },
+  {
+    "id": "heldout-order-preservation",
+    "split": "heldout",
+    "family": "order-preservation",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork training exercise requires exported records in oldest-first order."
+      ],
+      "relevant_context": "The fork reads the exported records without reordering.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/export.md w/docs/export.md\nindex e9cf661..a7914f5 100644\n--- i/docs/export.md\n+++ w/docs/export.md\n@@ -1 +1 @@\n-Records contain a name and creation time. Records appear oldest first.\n+Each record has a name and creation time. Records appear oldest first.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "The ordering requirement is unchanged by the prose edit."
+  },
+  {
+    "id": "heldout-archive-compression",
+    "split": "heldout",
+    "family": "archive-compression",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork installer must retain a supported ZIP download option."
+      ],
+      "relevant_context": "The installer uses ZIP and does not use tar.gz.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/downloads.md w/docs/downloads.md\nindex cd3f737..5b120d3 100644\n--- i/docs/downloads.md\n+++ w/docs/downloads.md\n@@ -1 +1 @@\n-Downloads include ZIP archives.\n+Downloads include ZIP and tar.gz archives.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "The established supported download remains available."
+  },
+  {
+    "id": "heldout-accessibility-addition",
+    "split": "heldout",
+    "family": "accessibility-addition",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork tutorial must preserve the annotated diagram."
+      ],
+      "relevant_context": "The diagram remains supplied at its existing location; the transcript is additive.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/media.md w/docs/media.md\nindex 3e5d967..1576818 100644\n--- i/docs/media.md\n+++ w/docs/media.md\n@@ -1 +1 @@\n-The tutorial includes an annotated diagram.\n+The tutorial includes an annotated diagram and a complete text transcript.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "The new alternate representation does not disturb the required diagram."
+  },
+  {
+    "id": "heldout-calendar-example",
+    "split": "heldout",
+    "family": "calendar-example",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork scheduler must retain the operator-selected time of 14:00 UTC."
+      ],
+      "relevant_context": "The scheduler loads its time from separate fork configuration, not documentation examples.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/scheduling.md w/docs/scheduling.md\nindex 73bd751..ef584b6 100644\n--- i/docs/scheduling.md\n+++ w/docs/scheduling.md\n@@ -1 +1 @@\n-For example, schedule a daily report at 09:00 UTC. The example time is optional.\n+For example, schedule a daily report at 10:00 UTC. The example time is optional.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "An explicitly optional example change does not alter the actual configured schedule."
+  },
+  {
+    "id": "heldout-redistribution-terms",
+    "split": "heldout",
+    "family": "redistribution-terms",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork release process must retain permission to distribute its binary bundle under the stated project terms."
+      ],
+      "relevant_context": "The fork currently publishes a binary bundle containing this component. The policy requires a maintainer decision when that permission is removed.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/LICENSE w/LICENSE\nindex ae3c256..598c6a9 100644\n--- i/LICENSE\n+++ w/LICENSE\n@@ -1 +1 @@\n-Redistribution of source and binary copies is permitted.\n+Redistribution of source copies is permitted. Redistribution of binary copies is prohibited.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The changed stated permission triggers the explicit local distribution decision; no general legal conclusion is claimed."
+  },
+  {
+    "id": "heldout-unit-change",
+    "split": "heldout",
+    "family": "unit-change",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork dashboard must display correct millisecond durations."
+      ],
+      "relevant_context": "Its adapter currently copies the duration number directly into a field labeled milliseconds.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/metrics.md w/docs/metrics.md\nindex 5fb9a56..d27ec42 100644\n--- i/docs/metrics.md\n+++ w/docs/metrics.md\n@@ -1 +1 @@\n-The duration value is measured in milliseconds.\n+The duration value is measured in seconds.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The local adapter must account for the changed unit."
+  },
+  {
+    "id": "heldout-callback-contract",
+    "split": "heldout",
+    "family": "callback-contract",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork integration must display the completed result from its completion hook."
+      ],
+      "relevant_context": "The fork callback currently reads result.summary directly from its argument.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/hooks.md w/docs/hooks.md\nindex 72ad5f4..5c8177b 100644\n--- i/docs/hooks.md\n+++ w/docs/hooks.md\n@@ -1 +1 @@\n-The on_complete hook receives the result object.\n+The on_complete hook receives a job identifier; fetch the result separately.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The callback argument change requires a fork integration adaptation."
+  },
+  {
+    "id": "heldout-storage-location",
+    "split": "heldout",
+    "family": "storage-location",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork backup procedure must include persistent cache data."
+      ],
+      "relevant_context": "Its backup procedure includes the user cache directory and excludes the user data directory.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/cache.md w/docs/cache.md\nindex c0f3384..51705d0 100644\n--- i/docs/cache.md\n+++ w/docs/cache.md\n@@ -1 +1 @@\n-Persistent cache data lives under the user cache directory.\n+Persistent cache data now lives under the user data directory; the old cache directory is unused.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The backup coverage no longer includes the documented persistent data."
+  },
+  {
+    "id": "heldout-interactive-authentication",
+    "split": "heldout",
+    "family": "interactive-authentication",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork scheduled job must use a supported unattended authentication path."
+      ],
+      "relevant_context": "The job runs without a browser or human operator at execution time.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/auth.md w/docs/auth.md\nindex 780bee4..368992c 100644\n--- i/docs/auth.md\n+++ w/docs/auth.md\n@@ -1 +1 @@\n-Service accounts authenticate using environment-provided tokens without prompts.\n+All accounts must complete an interactive browser sign-in before every run; environment tokens are no longer accepted.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The newly required interactive flow conflicts with the unattended job obligation."
+  },
+  {
+    "id": "heldout-network-requirement",
+    "split": "heldout",
+    "family": "network-requirement",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork workshop must provide a complete help bundle for an offline room."
+      ],
+      "relevant_context": "The room has no network connection during the workshop.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/offline.md w/docs/offline.md\nindex 8a9b6bd..e2018c3 100644\n--- i/docs/offline.md\n+++ w/docs/offline.md\n@@ -1 +1 @@\n-The help bundle can be viewed without network access.\n+The help bundle fetches its content from the server when opened and requires network access.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The revised help delivery requires an adaptation for the offline obligation."
+  },
+  {
+    "id": "heldout-ordering-semantics",
+    "split": "heldout",
+    "family": "ordering-semantics",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork recommendation panel must display the highest-relevance result first."
+      ],
+      "relevant_context": "The panel displays the first search result without additional ranking.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/search.md w/docs/search.md\nindex 5440bc4..fa040a9 100644\n--- i/docs/search.md\n+++ w/docs/search.md\n@@ -1 +1 @@\n-Search results are ordered from highest relevance to lowest.\n+Search results are ordered alphabetically by title.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The changed ordering invalidates the panel behavior."
+  },
+  {
+    "id": "heldout-retention-semantics",
+    "split": "heldout",
+    "family": "retention-semantics",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork weekly audit must retain completed job history for seven days."
+      ],
+      "relevant_context": "The fork audit reads the service history directly and stores no local copy.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/history.md w/docs/history.md\nindex 22ecda9..38d3501 100644\n--- i/docs/history.md\n+++ w/docs/history.md\n@@ -1 +1 @@\n-Completed job history remains available until explicitly removed.\n+Completed job history is removed automatically after twenty-four hours.\n"
+    },
+    "expected": "additional_handling",
+    "rationale": "The new retention period cannot support the documented weekly audit without handling."
+  },
+  {
+    "id": "heldout-missing-bundle-membership",
+    "split": "heldout",
+    "family": "missing-bundle-membership",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork release must have the required grant for each bundled component."
+      ],
+      "relevant_context": "The fork bundle manifest and any grant for Component Z are not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/distribution.md w/docs/distribution.md\nindex 20fe9bd..1b8d920 100644\n--- i/docs/distribution.md\n+++ w/docs/distribution.md\n@@ -1 +1 @@\n-Distribution terms permit packaged components.\n+Component Z now requires a separate distribution grant.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "Need to know whether Z is included and, if so, whether its grant exists."
+  },
+  {
+    "id": "heldout-missing-metric-unit",
+    "split": "heldout",
+    "family": "missing-metric-unit",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork dashboard must display correct millisecond durations."
+      ],
+      "relevant_context": "The adapter copies the numeric duration. Schema version 2 and its duration unit are not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/metrics.md w/docs/metrics.md\nindex 21d62a3..fbefc01 100644\n--- i/docs/metrics.md\n+++ w/docs/metrics.md\n@@ -1 +1 @@\n-The duration field follows schema version 1.\n+The duration field follows schema version 2, including its unit definition.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The unit needed to assess the adapter is missing."
+  },
+  {
+    "id": "heldout-missing-callback-consumer",
+    "split": "heldout",
+    "family": "missing-callback-consumer",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork integration must display completed result summaries."
+      ],
+      "relevant_context": "The fork callback implementation is not supplied; it may already fetch URLs.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/hooks.md w/docs/hooks.md\nindex 202b1db..b60ca53 100644\n--- i/docs/hooks.md\n+++ w/docs/hooks.md\n@@ -1 +1 @@\n-Completion hooks receive a full result.\n+Completion hooks receive a result URL instead of the full result.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The local integration behavior needed to assess compatibility is absent."
+  },
+  {
+    "id": "heldout-unknown-backup-scope",
+    "split": "heldout",
+    "family": "unknown-backup-scope",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork backup must cover persistent data."
+      ],
+      "relevant_context": "The shared store location and the fork backup inclusion rules are not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/storage.md w/docs/storage.md\nindex 4147f63..149967f 100644\n--- i/docs/storage.md\n+++ w/docs/storage.md\n@@ -1 +1 @@\n-Persistent data uses the original workspace store.\n+Persistent data uses the new shared store.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "Both the new data placement and local backup coverage are required for this obligation."
+  },
+  {
+    "id": "heldout-missing-auth-policy",
+    "split": "heldout",
+    "family": "missing-auth-policy",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork scheduled job must have a supported unattended authentication path."
+      ],
+      "relevant_context": "The delegated flow document is not supplied. The job currently runs unattended.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/auth.md w/docs/auth.md\nindex 1e07e8c..0af8d1b 100644\n--- i/docs/auth.md\n+++ w/docs/auth.md\n@@ -1 +1 @@\n-Service accounts use the standard token flow.\n+Service accounts use the new delegated flow described in docs/delegated-auth.md.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The required flow details determine whether unattended operation remains supported."
+  },
+  {
+    "id": "heldout-unknown-network-environment",
+    "split": "heldout",
+    "family": "unknown-network-environment",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork installer must work in the supported deployment environment."
+      ],
+      "relevant_context": "The deployment environment network availability and allowed endpoints are not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/install.md w/docs/install.md\nindex e6babcf..1109f2f 100644\n--- i/docs/install.md\n+++ w/docs/install.md\n@@ -1 +1 @@\n-Installation uses the bundled catalog.\n+Installation retrieves the catalog from the service at install time.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "Need the actual environment constraints to assess the new network requirement."
+  },
+  {
+    "id": "heldout-missing-ranking-definition",
+    "split": "heldout",
+    "family": "missing-ranking-definition",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork recommendation panel must display the highest-relevance result first."
+      ],
+      "relevant_context": "The panel takes the first result. The definition of ranking policy B is not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/search.md w/docs/search.md\nindex 34a48a0..4e35b95 100644\n--- i/docs/search.md\n+++ w/docs/search.md\n@@ -1 +1 @@\n-Results use ranking policy A.\n+Results use ranking policy B as defined in docs/ranking-b.md.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The ordering semantics relevant to the panel obligation are missing."
+  },
+  {
+    "id": "heldout-unknown-audit-cadence",
+    "split": "heldout",
+    "family": "unknown-audit-cadence",
+    "origin": "synthetic",
+    "state": {
+      "purpose": "Assess one bounded pure-mirror sync compatibility case. This fixture does not authorize a merge.",
+      "upstream": "constructed public-text fixture; not an actual upstream release",
+      "fork_context": "Preserve upstream-owned product files byte-for-byte. Fork-local consumers and procedures are maintained separately and may require adaptation.",
+      "fork_obligations": [
+        "The fork audit must be able to read every completed job since its preceding run."
+      ],
+      "relevant_context": "The audit interval and whether it keeps a local copy are not supplied.",
+      "deterministic_preconditions": "Assume source identity, clean merge, ownership separation, and ordinary text-file modes have already passed independent checks. This question does not decide those checks.",
+      "diff": "diff --git i/docs/history.md w/docs/history.md\nindex e77442b..d8a9d73 100644\n--- i/docs/history.md\n+++ w/docs/history.md\n@@ -1 +1 @@\n-Job history is retained indefinitely.\n+Job history is retained for thirty days.\n"
+    },
+    "expected": "insufficient_context",
+    "rationale": "The supplied retention period cannot be compared with the missing local audit behavior."
+  },
+  {
+    "id": "heldout-real-historical-release",
+    "split": "heldout",
+    "family": "real-historical-release",
+    "origin": "real_historical",
+    "source_state_path": "../jev-probe-state.json",
+    "source_state_sha256": "403107fc7421274e6819d2c124c63b36fc19e4dfa038b95246f3c7e30fe0c5f8",
+    "state": {
+      "purpose": "Read-only Jev route proof over a public historical upstream release; no merge or activation decision is made from the answer.",
+      "upstream": "https://github.com/typesafe-ai/skills",
+      "base_commit": "619f78a23e52cadfed03c9483235e2f333ad2416",
+      "target_commit": "65a39f393687675ce170e6094757de20370365b9",
+      "fork_context": "The fork mirrors upstream product files exactly. This historical example has no fork-local product changes. Separate future fork policy and automation files are outside this historical diff.",
+      "diff": "diff --git a/.claude-plugin/marketplace.json b/.claude-plugin/marketplace.json\nnew file mode 100644\nindex 0000000..64ab26b\n--- /dev/null\n+++ b/.claude-plugin/marketplace.json\n@@ -0,0 +1,15 @@\n+{\n+  \"name\": \"typesafe-ai\",\n+  \"description\": \"Agent skills for building with the TypeSafe System One API.\",\n+  \"owner\": {\n+    \"name\": \"TypeSafe AI\",\n+    \"url\": \"https://typesafe.ai\"\n+  },\n+  \"plugins\": [\n+    {\n+      \"name\": \"typesafe\",\n+      \"description\": \"Full context on the TypeSafe API: question types, architectural patterns, and best practices\",\n+      \"source\": \"./\"\n+    }\n+  ]\n+}\ndiff --git a/.claude-plugin/plugin.json b/.claude-plugin/plugin.json\nnew file mode 100644\nindex 0000000..c06b7f2\n--- /dev/null\n+++ b/.claude-plugin/plugin.json\n@@ -0,0 +1,12 @@\n+{\n+  \"name\": \"typesafe\",\n+  \"version\": \"0.5.7\",\n+  \"description\": \"Agent skills for building with the TypeSafe System One API.\",\n+  \"author\": {\n+    \"name\": \"TypeSafe AI\",\n+    \"url\": \"https://typesafe.ai\"\n+  },\n+  \"homepage\": \"https://typesafe.ai\",\n+  \"repository\": \"https://github.com/typesafe-ai/skills\",\n+  \"license\": \"MIT\"\n+}\ndiff --git a/LICENSE b/LICENSE\nnew file mode 100644\nindex 0000000..8c73b41\n--- /dev/null\n+++ b/LICENSE\n@@ -0,0 +1,21 @@\n+MIT License\n+\n+Copyright (c) 2026 TypeSafe AI\n+\n+Permission is hereby granted, free of charge, to any person obtaining a copy\n+of this software and associated documentation files (the \"Software\"), to deal\n+in the Software without restriction, including without limitation the rights\n+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n+copies of the Software, and to permit persons to whom the Software is\n+furnished to do so, subject to the following conditions:\n+\n+The above copyright notice and this permission notice shall be included in all\n+copies or substantial portions of the Software.\n+\n+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n+SOFTWARE.\ndiff --git a/README.md b/README.md\nindex 0460fc0..9976e1f 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,3 +1,42 @@\n # TypeSafe Agent Skills\n \n-Agent skills for building with [TypeSafe](https://typesafe.ai). First release coming soon.\n+Agent skills for building with [TypeSafe](https://typesafe.ai): typed decisions and probabilities from System One models.\n+\n+You can [read SKILL.md on GitHub](https://github.com/typesafe-ai/skills/blob/main/skills/typesafe-ai/SKILL.md) or fetch its [raw Markdown](https://raw.githubusercontent.com/typesafe-ai/skills/main/skills/typesafe-ai/SKILL.md).\n+\n+## Install\n+\n+### Claude Code plugin\n+\n+Run in your terminal:\n+\n+```bash\n+claude plugin marketplace add typesafe-ai/skills\n+claude plugin install typesafe@typesafe-ai\n+```\n+\n+### Other agents via skills.sh\n+\n+```bash\n+npx skills add typesafe-ai/skills --skill typesafe-ai\n+```\n+\n+Select your agent when prompted. Installation is project-local by default; add `-g` to install globally.\n+\n+See the [installation guide](https://docs.typesafe.ai/agent-skill#installation) for a prompt to copy to your agent, manual installation, and updates.\n+\n+## Use\n+\n+Ask your agent, for example:\n+\n+> Use TypeSafe to route incoming support tickets by department, with human review for uncertain decisions.\n+\n+In Claude Code, you can explicitly invoke the plugin skill with `/typesafe:typesafe-ai`.\n+\n+| Skill | Purpose |\n+|---|---|\n+| [typesafe-ai](skills/typesafe-ai/SKILL.md) | Design TypeSafe workflows, find current docs and cookbooks, and compose typed judgments in code |\n+\n+## License\n+\n+[MIT](LICENSE).\ndiff --git a/skills/typesafe-ai/LICENSE b/skills/typesafe-ai/LICENSE\nnew file mode 100644\nindex 0000000..8c73b41\n--- /dev/null\n+++ b/skills/typesafe-ai/LICENSE\n@@ -0,0 +1,21 @@\n+MIT License\n+\n+Copyright (c) 2026 TypeSafe AI\n+\n+Permission is hereby granted, free of charge, to any person obtaining a copy\n+of this software and associated documentation files (the \"Software\"), to deal\n+in the Software without restriction, including without limitation the rights\n+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n+copies of the Software, and to permit persons to whom the Software is\n+furnished to do so, subject to the following conditions:\n+\n+The above copyright notice and this permission notice shall be included in all\n+copies or substantial portions of the Software.\n+\n+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n+SOFTWARE.\ndiff --git a/skills/typesafe-ai/SKILL.md b/skills/typesafe-ai/SKILL.md\nnew file mode 100644\nindex 0000000..0109513\n--- /dev/null\n+++ b/skills/typesafe-ai/SKILL.md\n@@ -0,0 +1,149 @@\n+---\n+name: typesafe-ai\n+license: MIT\n+description: >\n+  Build AI-powered software with TypeSafe: small units of AI intelligence you\n+  can use like programming primitives. Its System One models, including Jev,\n+  turn natural language and application state into typed judgments and\n+  probabilities that code can combine. Use when a feature needs programmable\n+  common sense, when brainstorming what AI could make possible in an app, or\n+  when an LLM prompt-and-parse step could become a structured decision.\n+  Applications include routing, ranking, extraction, verification, and\n+  interactive experiences; these are starting points, not the limits.\n+  Read live docs and cookbooks to find useful patterns and discover new combinations.\n+---\n+\n+# Build with TypeSafe\n+\n+TypeSafe makes units of AI intelligence usable like programming primitives: small\n+judgments you can compose into larger capabilities. Its **System One models** return\n+fast, focused judgments that software can consume directly. **Jev** is TypeSafe's\n+flagship and first System One model. It understands natural language and returns\n+typed answers and probabilities rather\n+than generating text or reasoning explanations. Code owns the workflow; the model\n+supplies programmable common sense where ordinary code needs semantic understanding.\n+\n+## Read the live docs\n+\n+**The live TypeSafe docs are the source of truth. Read them as part of the task.**\n+This skill gives direction; the docs carry current concepts, prompting guidance,\n+API contracts, SDK usage, models, limits, and worked examples.\n+\n+- Start with the [documentation index](https://docs.typesafe.ai/llms.txt) to discover\n+  relevant pages and cookbooks. Use targeted reads rather than loading the entire site.\n+- Mintlify serves Markdown by appending `.md` to a page path, for example\n+  [how to build with TypeSafe](https://docs.typesafe.ai/concepts/how-to-build-with-system-one.md).\n+  Follow links from the index; convert extensionless documentation page links to\n+  `.md` when useful. Resolve relative links against `https://docs.typesafe.ai`.\n+- Before writing an integration, read the current API or chosen SDK page and the\n+  question guidance relevant to the design. For a new workflow, also inspect the\n+  closest cookbook: it often shows a better decomposition than a generic classifier.\n+- If the index is unavailable, use the direct links below or the site's navigation.\n+  If Markdown fetching fails, try the normal page. If live access is unavailable,\n+  use available local docs or installed SDK types, state that limitation, and avoid\n+  inventing version-dependent details.\n+\n+| Task | Start here; follow the relevant details |\n+| --- | --- |\n+| Understand the programming model | [System One](https://docs.typesafe.ai/concepts/system-one.md), [building guide](https://docs.typesafe.ai/concepts/how-to-build-with-system-one.md) |\n+| Explore what to build | [Use-case map](https://docs.typesafe.ai/concepts/use-case-map.md), then relevant cookbooks from the index |\n+| Prepare inputs and questions | [State](https://docs.typesafe.ai/concepts/state.md), [primitives](https://docs.typesafe.ai/primitives.md), then the chosen primitive's page |\n+| Decide how to handle uncertainty | [Confidence](https://docs.typesafe.ai/confidence.md) |\n+| Write API code | [HTTP API](https://docs.typesafe.ai/api.md), [Python SDK](https://docs.typesafe.ai/sdk/python.md), or [JavaScript SDK](https://docs.typesafe.ai/sdk/javascript.md) |\n+| Update an older integration | [Migration guide](https://docs.typesafe.ai/migrating-to-v1.md) and the installed SDK's current reference |\n+\n+## Find the useful shape\n+\n+Start from the behavior the user wants: what will the application show, select,\n+change, or hand off? Work backward to the judgments it needs. Keep known rules,\n+calculations, exact lookups, and execution in code. Preserve the user's chosen stack\n+and scope; add TypeSafe where semantic understanding helps.\n+\n+When brainstorming or choosing an architecture, consider more than classification.\n+The patterns below are starting points: combine primitives around the user's goal,\n+including ideas that do not fit an established recipe.\n+\n+- **Route and fill known arguments.** A request can select a handler and its typed\n+  parameters. Ask useful branch-specific questions up front and consume only the\n+  relevant answers. Explore [function calling](https://docs.typesafe.ai/cookbooks/function_calling.md)\n+  and [speculative fan-out](https://docs.typesafe.ai/patterns/fan-out.md).\n+- **Select instead of generate.** Find candidate values or source spans in code,\n+  use a judgment to select the intended one, then copy or normalize it. Code can\n+  also assemble source text into a formatted document or reading guide. Explore\n+  [value extraction](https://docs.typesafe.ai/cookbooks/pre_parsed_value_extraction_cookbook.md)\n+  and [structure recovery](https://docs.typesafe.ai/cookbooks/autoformat.md).\n+- **Find and judge evidence.** Retrieve candidates, compare their relevance to a\n+  query, and select useful context. Explore [reranking](https://docs.typesafe.ai/cookbooks/rerank_typesafe.md)\n+  and [hierarchical classification](https://docs.typesafe.ai/cookbooks/hierarchical_classification.md).\n+- **Turn judgments into reusable data.** Score dimensions once, then let code or\n+  user controls change weights, thresholds, rankings, and views. With labeled\n+  outcomes, those signals can become classical ML features. Explore\n+  [composite scoring](https://docs.typesafe.ai/patterns/composite-scoring.md) and\n+  [feature discovery](https://docs.typesafe.ai/cookbooks/autoresearch_feature_discovery.md).\n+- **Verify and escalate.** Check specific claims or fields against their evidence;\n+  send uncertain or failing cases to a person or reasoning model. Explore\n+  [citation checks](https://docs.typesafe.ai/cookbooks/citation_check.md) and\n+  [extraction cascades](https://docs.typesafe.ai/cookbooks/sde_cascade.md).\n+- **Respond to changing state.** Code can retain goals and observations while fresh\n+  judgments guide the next bounded step. Keep inferred state distinct from observed\n+  facts, and check freshness before applying a result to a changed situation.\n+\n+For open-ended requests, offer the few directions that best serve the user's goal\n+and recommend a starting point. For a concrete request, choose the relevant pattern\n+and build; a brainstorm is not a mandatory detour.\n+\n+## Design the judgments\n+\n+Choose by what the answer means, then read the relevant primitive page:\n+\n+| Need | Primitive | Important distinction |\n+| --- | --- | --- |\n+| One of a defined set | [Choice](https://docs.typesafe.ai/primitives/choice.md) | Picks one option; its distribution compares competing options |\n+| Whether a condition holds | [Noul](https://docs.typesafe.ai/primitives/noul.md) | Probability of yes; no separate confidence; use one per label when several may apply |\n+| Degree along a described dimension | [Score](https://docs.typesafe.ai/primitives/score.md) | Probability-weighted position on ordered levels; use comparable per-item Scores for graded ranking |\n+\n+Give each question enough relevant **state** to answer: source text, identities,\n+relationships, policies, and current facts. Prefer named JSON fields when context\n+has several parts. Put the judgment in **instructions** and define its possible\n+answers in **criteria**. Question IDs are for code and are not sent to the model;\n+include complete meaning in the question. Reference nested state with backticked\n+paths such as `ticket.messages[0].text`.\n+\n+Ask one narrow, coherent judgment per question. Split independently useful dimensions,\n+without destroying the relationship being judged. A bounded action selection or\n+contextual interpretation is valid; atomic does not mean literal fact extraction\n+or a one-sentence limit. Strings work for simple questions. Use structured objects\n+or arrays when definitions, contrasts, exclusions, or examples clarify instructions\n+or criteria. Score levels must describe concrete situations and stand on their own.\n+\n+Keep the needed answers available. Include a no-match outcome when nothing may fit;\n+use a separate presence judgment when it is independently useful. For source-value\n+selection, check candidate coverage: the model cannot choose an omitted value.\n+\n+## Compose and verify\n+\n+**Ask independent questions over the same state together**, including useful\n+speculative questions. They run in parallel and cannot see one another's answers.\n+State each speculative premise explicitly; code consumes the applicable answers.\n+A second request is warranted when an earlier answer is needed to fetch evidence,\n+construct new state, or determine the next options. Extra questions still use tokens;\n+measure actual request budgets, cost, and end-to-end latency.\n+\n+Use probabilities and confidence to guide behavior, with thresholds evaluated on\n+the user's data and consequences. Choice/Score confidence summarizes distribution\n+concentration, not overall workflow correctness or permission to act. A Noul near\n+0.5 means similar probability for yes and no, not medium intensity. Several\n+acceptable alternatives can also spread probability; low confidence need not\n+invalidate a harmless preference choice. Ignore uncertainty on unused branches.\n+\n+Keep policy explicit and raw judgments reusable. Weighted scores suit compensating\n+preferences; an “any serious violation” rule needs separate conditions. Changing a\n+weight or display filter need not rerun inference when evidence and question meanings\n+are unchanged. Typed output guarantees the interface, not truth. System One models\n+are trained for calibrated decisions; validate their performance in the target domain.\n+\n+Test representative cases and the resulting application behavior. For failures,\n+inspect the exact state, questions, candidates, answers, composition, and observed\n+outcome. Separate missing evidence, model errors, code errors, and service failures.\n+Treat cookbook thresholds and demo results as examples to evaluate, not universal\n+rules or permanent model limitations. Keep API credentials server-side in web apps.\n"
+    },
+    "expected": "no_additional_handling",
+    "rationale": "This historical pure mirror has no fork-local product changes or supplied additional consumer obligations. The release can be preserved unchanged. This case was previously probed and is an integration anchor, not a blind model test."
+  }
+]
