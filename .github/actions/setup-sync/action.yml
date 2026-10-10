@@ -12,6 +12,8 @@ runs:
           config_names="$(sudo --non-interactive /usr/bin/git config --system --no-includes --name-only --list)" || return "$?"
           while IFS= read -r config_name; do
             case "$config_name" in
+              # Git variable names cannot contain dots; these are other subsections.
+              filter.lfs.*.*) ;;
               filter.lfs.*) printf '%s\n' "$config_name" ;;
             esac
           done <<< "$config_names"
@@ -20,7 +22,10 @@ runs:
         lfs_names="$(read_lfs_names)"
         if [ -n "$lfs_names" ]; then
           printf '%s\n' "$lfs_names"
-          sudo --non-interactive /usr/bin/git config --system --no-includes --remove-section filter.lfs
+          lfs_names="$(printf '%s\n' "$lfs_names" | LC_ALL=C sort -u)"
+          while IFS= read -r lfs_name; do
+            sudo --non-interactive /usr/bin/git config --system --no-includes --unset-all "$lfs_name"
+          done <<< "$lfs_names"
         fi
         echo 'Verifying system Git LFS filter names after normalization'
         lfs_names="$(read_lfs_names)"
