@@ -2,7 +2,11 @@
 
 The approved gate accepts `no_additional_handling` from `jev-1.13.0` when that option's probability is at least 0.96. All other results hold. This directory preserves the bounded experiment supporting that decision; it does not qualify hosted execution or estimate future production error.
 
-The 24 constructed development cases selected the threshold before the held-out calls. On 23 untouched constructed validation cases, the gate accepted five of seven ordinary changes and held all sixteen cases needing handling or more context. The separate historical update also passed at 0.98. Its earlier probe was already known, so it is an integration anchor rather than a blind validation case. A blind Sol 6.1 label comparison matched all 48 proposed labels; it is model comparison, not human ground truth.
+The 24 constructed development cases selected the threshold before the held-out calls. On 23 untouched constructed validation cases, the gate accepted five of seven ordinary changes and held all sixteen cases needing handling or more context. The historical update also passed at 0.98. Its earlier probe was already known, so it is an integration anchor rather than a blind validation case.
+
+The preserved `results.json` field `summary.heldout` describes the original 24-case cohort including that anchor: six of eight ordinary cases accepted and all sixteen cases needing handling or more context held. The 23 untouched constructed cases above exclude the anchor. The separate `real_anchor` entry describes the same observation already included in that aggregate and the 48 recorded calls; it is not an additional call.
+
+A blind Sol 6.1 label comparison matched all 48 proposed labels; it is model comparison, not human ground truth.
 
 `cases.json` retains the frozen inputs and expected labels. Expected labels and rationales are outside the submitted state. `questions.json` is the approved question; the policy embeds identical canonical question bytes. `freeze.json` identifies the corpus and question. `development-policy.json` preserves the threshold selection before held-out observations, including its then-pending acceptance status. `frontier-labels.json` and `results.json` retain the independent label pass and measured results.
 

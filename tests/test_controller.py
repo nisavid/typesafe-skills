@@ -10,12 +10,15 @@ from test_gates import accepted_evidence
 
 
 class HostedResponses:
-    def __init__(self, ready=False, drift=False):
+    def __init__(self, ready=False, drift=False, protection_updates=None, weaken_after_judgment=False):
         self.published = []
         self.merged = []
         self.ready = ready
         self.drift = drift
         self.observations = 0
+        self.protection_updates = protection_updates or {}
+        self.weaken_after_judgment = weaken_after_judgment
+        self.judgments = 0
 
     def publish(self, repo, candidate, policy, dependency):
         self.published.append(candidate)
@@ -32,12 +35,15 @@ class HostedResponses:
             evidence['checks'][0]['head'] = candidate['head']
             evidence['reviews'][0]['commit_id'] = candidate['head']
             evidence.pop('jev')
+            if not self.weaken_after_judgment or self.judgments:
+                evidence['protection'].update(self.protection_updates)
             if self.drift and self.observations > 1:
                 evidence['live_base'] = '0' * 40
             return evidence
         return {'error': 'checks_not_yet_available'}
 
     def judge(self, repo, candidate, policy):
+        self.judgments += 1
         if self.ready:
             _, evidence, _ = accepted_evidence()
             evidence['jev']['binding'] = {key: candidate[key] for key in ('base', 'upstream', 'head', 'tree', 'policy_sha256', 'questions_sha256')}
@@ -145,6 +151,21 @@ class ControllerTests(unittest.TestCase):
             result = reconcile(repo, base, upstream, raw, repo, services=drifted)
             self.assertEqual(result['status'], 'hold', result)
             self.assertEqual(drifted.merged, [])
+            for protection_updates in (
+                {'required_approving_review_count': 0},
+                {'dismiss_stale_reviews': False},
+                {'required_conversation_resolution': False},
+                {'review_bypass_allowances': {'users': [], 'teams': [], 'apps': [{'id': 123}]}},
+            ):
+                for after_judgment in (False, True):
+                    with self.subTest(protection_updates=protection_updates, after_judgment=after_judgment):
+                        weakened = HostedResponses(ready=True, protection_updates=protection_updates,
+                                                   weaken_after_judgment=after_judgment)
+                        result = reconcile(repo, base, upstream, raw, repo, services=weakened)
+                        self.assertEqual(result['status'], 'hold', result)
+                        self.assertEqual(result['reasons'], ['protection_inadequate'])
+                        self.assertEqual(weakened.merged, [])
+                        self.assertEqual(weakened.judgments, int(after_judgment))
             changed_policy = json.loads(raw)
             changed_policy['fork_obligations'] = ['unreviewed policy from outside the base']
             remote = HostedResponses()
