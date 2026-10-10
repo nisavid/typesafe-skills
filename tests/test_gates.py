@@ -23,6 +23,9 @@ def accepted_evidence():
         "questions_sha256": policy["questions_sha256"],
         "mergeability": "clean", "unresolved_threads": 0,
         "protection": {"enforce_admins": True, "strict": True,
+                       "required_approving_review_count": 1, "dismiss_stale_reviews": True,
+                       "required_conversation_resolution": True,
+                       "review_bypass_allowances": {"users": [], "teams": [], "apps": []},
                        "required_checks": [{"name": "sync-ci", "app_id": 15368}]},
         "checks": [{"name": "sync-ci", "app_id": 15368,
                     "head": candidate["head"], "status": "completed",
@@ -110,21 +113,61 @@ class GateTests(unittest.TestCase):
                                                    submitted_at="2026-10-07T22:00:00Z"))
                 self.assertEqual(evaluate(candidate, observation, policy)["status"], "ready")
 
+    def test_review_protection_must_enforce_approval_dismissal_and_conversations(self):
+        invalid_values = {
+            "required_approving_review_count": (None, 0, -1, True, 1.0, "1", [], {}),
+            "dismiss_stale_reviews": (None, False, 1, "true", [], {}),
+            "required_conversation_resolution": (None, False, 1, "true", [], {}),
+        }
+        for field, values in invalid_values.items():
+            for value in (*values, "missing"):
+                with self.subTest(field=field, value=value):
+                    candidate, observation, policy = accepted_evidence()
+                    if value == "missing":
+                        del observation["protection"][field]
+                    else:
+                        observation["protection"][field] = value
+                    self.assertEqual(evaluate(candidate, observation, policy),
+                                     {"status": "hold", "reasons": ["protection_inadequate"]})
+        candidate, observation, policy = accepted_evidence()
+        observation["protection"]["required_approving_review_count"] = 2
+        self.assertEqual(evaluate(candidate, observation, policy)["status"], "ready")
+
+    def test_review_bypass_allowances_must_be_complete_and_empty(self):
+        variants = [None, {}, [], False, {"users": [], "teams": []}]
+        for category in ("users", "teams", "apps"):
+            for value in ([{"id": 123}], None, {}, "", False):
+                variants.append({**{"users": [], "teams": [], "apps": []}, category: value})
+        variants.append({"users": [], "teams": [], "apps": [], "unknown": []})
+        for allowances in variants:
+            with self.subTest(allowances=allowances):
+                candidate, observation, policy = accepted_evidence()
+                observation["protection"]["review_bypass_allowances"] = allowances
+                self.assertEqual(evaluate(candidate, observation, policy),
+                                 {"status": "hold", "reasons": ["protection_inadequate"]})
+        candidate, observation, policy = accepted_evidence()
+        del observation["protection"]["review_bypass_allowances"]
+        self.assertEqual(evaluate(candidate, observation, policy),
+                         {"status": "hold", "reasons": ["protection_inadequate"]})
+
     def test_unsafe_merge_state_holds(self):
         for field, value in (("mergeability", "unknown"), ("mergeability", "conflicting"),
                              ("unresolved_threads", 1), ("unresolved_threads", None),
                              ("unresolved_threads", False), ("protection", {}),
-                             ("protection", None),
-                             ("protection", {"enforce_admins": False, "strict": True,
-                                             "required_checks": [{"name": "sync-ci", "app_id": 15368}]}),
-                             ("protection", {"enforce_admins": True, "strict": False,
-                                             "required_checks": [{"name": "sync-ci", "app_id": 15368}]}),
-                             ("protection", {"enforce_admins": True, "strict": True,
-                                             "required_checks": []})):
+                             ("protection", None)):
             with self.subTest(field=field, value=value):
                 candidate, observation, policy = accepted_evidence()
                 observation[field] = value
                 self.assertEqual(evaluate(candidate, observation, policy)["status"], "hold")
+
+    def test_review_rules_do_not_replace_admin_and_required_check_protection(self):
+        for mutation in ({"enforce_admins": False}, {"strict": False}, {"required_checks": []},
+                         {"required_checks": [{"name": "sync-ci", "app_id": 1}]}):
+            with self.subTest(mutation=mutation):
+                candidate, observation, policy = accepted_evidence()
+                observation["protection"].update(mutation)
+                self.assertEqual(evaluate(candidate, observation, policy),
+                                 {"status": "hold", "reasons": ["protection_inadequate"]})
 
     def test_every_required_check_must_succeed_for_the_current_head_and_app(self):
         for mutation in ({"head": "0" * 40}, {"app_id": 1}, {"conclusion": "skipped"},

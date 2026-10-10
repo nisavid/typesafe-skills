@@ -1,7 +1,9 @@
 import json
 import os
 import subprocess
+import threading
 import unittest
+from collections import Counter
 from unittest.mock import patch
 
 from fork_sync.attempts import permit
@@ -29,6 +31,29 @@ def fixture():
     }
 
 
+def retained_history(count=100):
+    routes = fixture()
+    runs = routes[f"repos/{REPO}/actions/workflows/12/runs?per_page=100"][0]["workflow_runs"]
+    runs[0]["run_number"] = count
+    for number in range(2, count + 1):
+        run_id = 99 + number
+        runs.append({"id": run_id, "run_number": number - 1, "run_attempt": 2,
+                     "workflow_id": 12, "status": "completed", "repository": {"full_name": REPO}})
+        jobs = [{"id": 1000 + number * 2 + attempt, "run_id": run_id,
+                 "name": NAME, "status": "completed", "conclusion": "skipped",
+                 "started_at": None} for attempt in (1, 2)]
+        routes[f"repos/{REPO}/actions/runs/{run_id}/jobs?filter=all&per_page=100"] = [
+            {"total_count": 2, "jobs": [job]} for job in jobs]
+        for attempt, job in enumerate(jobs, 1):
+            routes[f"repos/{REPO}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100"] = [
+                {"total_count": 1, "jobs": [job]}]
+    routes[f"repos/{REPO}/actions/workflows/12/runs?per_page=100"] = [
+        {"total_count": count, "workflow_runs": runs[:50]},
+        {"total_count": count, "workflow_runs": runs[50:]},
+    ]
+    return routes
+
+
 class Transport:
     def __init__(self, routes):
         self.routes, self.calls = routes, []
@@ -42,6 +67,99 @@ class Transport:
 
 
 class AttemptTests(unittest.TestCase):
+    def test_complete_retained_history_overlaps_at_most_four_external_reads(self):
+        routes = retained_history()
+        transport = Transport(routes)
+        lock, four_reading, release = threading.Lock(), threading.Event(), threading.Event()
+        active, peak = 0, 0
+
+        def blocked_transport(args, **kwargs):
+            nonlocal active, peak
+            with lock:
+                active += 1
+                peak = max(peak, active)
+                if active == 4:
+                    four_reading.set()
+            try:
+                if "jobs?filter=all" in args[2]:
+                    if not release.wait(5):
+                        raise OSError("test transport was not released")
+                return transport(args, **kwargs)
+            finally:
+                with lock:
+                    active -= 1
+
+        result = []
+        with patch("subprocess.run", side_effect=blocked_transport):
+            runner = threading.Thread(target=lambda: result.append(permit(CANDIDATE, {"repository": REPO})))
+            runner.start()
+            try:
+                overlapped = four_reading.wait(2)
+                self.assertFalse(result, "history must finish before permission")
+            finally:
+                release.set()
+                runner.join(5)
+            self.assertFalse(runner.is_alive())
+        self.assertTrue(overlapped, "four independent history reads should overlap")
+        self.assertEqual(peak, 4, "at most four gh processes may be in flight")
+        self.assertEqual(result, [{"status": "permitted", "reasons": []}])
+        # Every page-bearing endpoint and both attempts of all 99 prior runs are required.
+        self.assertEqual(Counter(args[2] for args, _ in transport.calls), Counter(routes.keys()))
+
+    def test_delayed_old_attempt_must_finish_before_permission(self):
+        for outcome in ("skipped", "consumed", "unavailable", "timeout", "missing", "inconsistent"):
+            with self.subTest(outcome=outcome):
+                routes = retained_history(12)
+                delayed = f"repos/{REPO}/actions/runs/101/attempts/1/jobs?per_page=100"
+                if outcome == "consumed":
+                    # The all-attempt snapshot contains this same old job.
+                    routes[delayed][0]["jobs"][0]["conclusion"] = "failure"
+                elif outcome == "unavailable":
+                    routes[delayed] = OSError("retained attempt unavailable")
+                elif outcome == "timeout":
+                    routes[delayed] = subprocess.TimeoutExpired("gh", 90)
+                elif outcome == "missing":
+                    routes[delayed] = [{"total_count": 1, "jobs": []}]
+                elif outcome == "inconsistent":
+                    routes[delayed] = [{"total_count": 1, "jobs": [dict(
+                        routes[delayed][0]["jobs"][0], name="Jev " + "0" * 64)]}]
+                transport = Transport(routes)
+                waiting, others_finished, release = threading.Event(), threading.Event(), threading.Event()
+                lock, seen = threading.Lock(), set()
+                # Attempt two of the delayed run remains sequential behind attempt one.
+                independent = set(routes) - {delayed,
+                    f"repos/{REPO}/actions/runs/101/attempts/2/jobs?per_page=100"}
+
+                def delayed_transport(args, **kwargs):
+                    if args[2] == delayed:
+                        waiting.set()
+                        if not release.wait(5):
+                            raise OSError("test transport was not released")
+                    response = transport(args, **kwargs)
+                    with lock:
+                        seen.add(args[2])
+                        if independent <= seen:
+                            others_finished.set()
+                    return response
+
+                result = []
+                with patch("subprocess.run", side_effect=delayed_transport):
+                    runner = threading.Thread(target=lambda: result.append(permit(CANDIDATE, {"repository": REPO})))
+                    runner.start()
+                    try:
+                        self.assertTrue(waiting.wait(2), "the old attempt must be read")
+                        completed_independent = others_finished.wait(2)
+                        self.assertFalse(result, "an outstanding old attempt prevents permission")
+                    finally:
+                        release.set()
+                        runner.join(5)
+                    self.assertFalse(runner.is_alive())
+                self.assertTrue(completed_independent, "unrelated runs should finish while the old read waits")
+                expected = ({"status": "permitted", "reasons": []} if outcome == "skipped" else
+                            {"status": "hold", "reasons": ["jev_attempt_consumed" if outcome == "consumed"
+                                                          else "jev_attempt_unconfirmed"]})
+                self.assertEqual(result, [expected])
+
     def test_malformed_job_metadata_holds_without_raising(self):
         for field, value in (("id", True), ("name", 17), ("run_id", []), ("started_at", "invalid")):
             routes = fixture()
