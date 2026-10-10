@@ -174,9 +174,9 @@ class RunnerGitSetupTests(unittest.TestCase):
                 raise SystemExit(1)
             if os.environ.get("TEST_FINAL_LAUNCH_FAILURE") and "filter" not in config.read_text():
                 raise SystemExit(1)
-            if "--remove-section" in args and os.environ.get("TEST_REMOVE_FAILURE"):
+            if "--unset-all" in args and os.environ.get("TEST_REMOVE_FAILURE"):
                 raise SystemExit(17)
-            if "--remove-section" in args and os.environ.get("TEST_REMOVE_NO_EFFECT"):
+            if "--unset-all" in args and os.environ.get("TEST_REMOVE_NO_EFFECT"):
                 raise SystemExit(0)
             if "--list" in args and os.environ.get("TEST_READ_FAILURE"):
                 raise SystemExit(23)
@@ -261,6 +261,32 @@ class RunnerGitSetupTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("System Git LFS filters are absent", result.stdout)
         self.assertEqual(self.config.read_text(), '[safe]\n directory = *\n')
+
+    def test_uppercase_section_and_key_names_are_removed_but_other_subsections_remain(self):
+        preserved = '[safe]\n directory = *\n[filter "LFS"]\n clean = keep-uppercase-subsection\n'
+        self.config.write_text(preserved + '[FILTER "lfs"]\n CLEAN = git-lfs clean -- %f\n')
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_text(), preserved)
+        self.assertIn("System Git LFS filters are absent", result.stdout)
+
+    def test_mixed_case_duplicate_sections_and_keys_are_all_removed(self):
+        preserved = '[safe]\n directory = *\n[filter "LFS"]\n clean = keep-uppercase-subsection\n'
+        self.config.write_text(preserved + '[filter "lfs"]\n clean = first\n required = true\n'
+                               '[FILTER "lfs"]\n CLEAN = second\n SMUDGE = third\n'
+                               '[FiLtEr "lfs"]\n Clean = fourth\n REQUIRED = false\n')
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_text(), preserved)
+        self.assertIn("System Git LFS filters are absent", result.stdout)
+
+    def test_dotted_subsection_is_preserved(self):
+        preserved = '[filter "lfs.extra"]\n clean = keep-dotted-subsection\n'
+        self.config.write_text(preserved + '[FILTER "lfs"]\n CLEAN = remove\n')
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_text(), preserved)
+        self.assertIn("System Git LFS filters are absent", result.stdout)
 
     def test_duplicate_lfs_sections_are_removed(self):
         with self.config.open("a") as config:
