@@ -276,11 +276,20 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
                       "create_reviewable_pr.py": "create_pr",
                       "update_reviewable_pr.py": "mark_pr_ready",
                       "audit_reviewable_pr.py": "audit_pr"}
+        operation = operations[name]
+        if name == "audit_reviewable_pr.py" and arguments[0] == "reconcile":
+            operation = "reconcile_pr"
         return _run([sys.executable, directory / name, *arguments], repo, env,
-                    operation=operations[name], json_output=structured)
+                    operation=operation, json_output=structured)
     read_env = dict(env)
     if env.get("GH_READ_TOKEN"):
         read_env["GH_TOKEN"] = env["GH_READ_TOKEN"]
+    def inspect_pr(number):
+        live = _run(["gh", "pr", "view", str(number), "--repo", repository, "--json", FIELDS],
+                    repo, read_env, operation="inspect_pr", json_output=True)
+        if not isinstance(live, dict):
+            raise Hold("publication_command_invalid_response", operation="inspect_pr", exit_status=0)
+        return live
     identity = ["--repository", repository, "--base", target, "--base-oid", candidate["base"],
                 "--head", owner + ":" + branch, "--head-oid", candidate["head"],
                 "--head-owner", owner, "--head-repository", repository]
@@ -311,7 +320,7 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
     body, diff = _body(repository, candidate, rows, number, policy.get("publication_categories", {}))
     baseline = {"mode": "new", "title_sha256": None, "body_sha256": None, "fragments": []}
     if prs:
-        live = _run(["gh", "pr", "view", str(number), "--repo", repository, "--json", FIELDS], repo, read_env, operation="inspect_pr", json_output=True)
+        live = inspect_pr(number)
         prefix = _run([sys.executable, "-I", "-c",
                        "import sys; sys.path.insert(0,sys.argv[1]); from change_navigation.bot_body import authored_body; "
                        "sys.stdout.write(authored_body(sys.stdin.read(),expected_sha256=sys.argv[2]))",
@@ -351,6 +360,9 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
         except ValueError as error:
             raise Hold("invalid_publication_response_or_input",
                        operation="plan_branch_publication", exit_status=0) from error
+        if not isinstance(plan, dict):
+            raise Hold("invalid_publication_response_or_input",
+                       operation="plan_branch_publication", exit_status=0)
         push, destination = plan.get("push", {}), plan.get("destination", {})
         if (plan.get("status") != "ready" or plan.get("request") != request or plan.get("source_sha") != candidate["head"] or
                 destination.get("remote") != "origin" or destination.get("ref") != ref or destination.get("default_branch_ref") == ref or
@@ -373,7 +385,7 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
         if created.get("status") != "verified" or not isinstance(created.get("pr"), int):
             raise Hold("pr_creation_unverified")
         number = created["pr"]
-    live = _run(["gh", "pr", "view", str(number), "--repo", repository, "--json", FIELDS], repo, read_env, operation="inspect_pr", json_output=True)
+    live = inspect_pr(number)
     url = f"https://github.com/{repository}/pull/{number}"
     if (live.get("url") != url or live.get("state") != "OPEN" or live.get("headRefOid") != candidate["head"] or
             live.get("baseRefOid") != candidate["base"] or live.get("baseRefName") != target or

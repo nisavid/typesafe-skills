@@ -461,6 +461,84 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(world.writes, [])
             self.assertEqual(attempts, ["plan"])
 
+    def test_reconciliation_and_final_audit_failures_identify_the_failed_operation(self):
+        for failed_command, operation in (("reconcile", "reconcile_pr"), ("audit", "audit_pr")):
+            with self.subTest(command=failed_command), tempfile.TemporaryDirectory() as temporary:
+                world = HostedWorld(Path(temporary))
+                self.assertEqual(world.publish()["status"], "published")
+                world.pr["isDraft"] = True
+                world.writes.clear()
+                commands = []
+                def process(args, **kwargs):
+                    if Path(str(args[1])).name == "audit_reviewable_pr.py":
+                        commands.append(args[2])
+                        if args[2] == failed_command:
+                            return subprocess.CompletedProcess(args, 17, "private output", "private stderr")
+                    return world.run(args, **kwargs)
+                with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                    result = publish(world.repo, world.candidate, world.policy, world.dependency)
+                self.assertEqual(result, {
+                    "status": "hold", "reason": "publication_command_failed_or_outcome_unknown",
+                    "head": world.candidate["head"], "base": world.candidate["base"],
+                    "diagnostic": {"operation": operation, "exit_status": 17},
+                })
+                self.assertNotIn("private", json.dumps(result))
+                self.assertEqual(commands, ["reconcile"] if failed_command == "reconcile" else ["reconcile", "audit"])
+                self.assertEqual(world.writes, [] if failed_command == "reconcile" else ["ready"])
+                self.assertEqual(world.pr["isDraft"], failed_command == "reconcile")
+
+    def test_non_object_planner_response_holds_before_publication(self):
+        for payload in ("null", "[]", '"private response"'):
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temporary:
+                world = HostedWorld(Path(temporary))
+                attempts = []
+                def process(args, **kwargs):
+                    if Path(str(args[1])).name == "plan_git_publication.py":
+                        attempts.append("plan")
+                        return subprocess.CompletedProcess(args, 0, payload, "private stderr")
+                    return world.run(args, **kwargs)
+                with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                    result = publish(world.repo, world.candidate, world.policy, world.dependency)
+                self.assertEqual(result, {
+                    "status": "hold", "reason": "invalid_publication_response_or_input",
+                    "head": world.candidate["head"], "base": world.candidate["base"],
+                    "diagnostic": {"operation": "plan_branch_publication", "exit_status": 0},
+                })
+                self.assertNotIn("private", json.dumps(result))
+                self.assertEqual(attempts, ["plan"])
+                self.assertEqual(world.writes, [])
+                self.assertIsNone(world.remote_sha)
+                self.assertIsNone(world.pr)
+
+    def test_non_object_pr_inspections_hold_without_readiness_or_retry(self):
+        for existing, failed_inspection in ((False, 1), (True, 1), (True, 2)):
+            for payload in ("null", "[]", '"private response"'):
+                with self.subTest(existing=existing, inspection=failed_inspection, payload=payload), tempfile.TemporaryDirectory() as temporary:
+                    world = HostedWorld(Path(temporary))
+                    if existing:
+                        self.assertEqual(world.publish()["status"], "published")
+                        world.pr["isDraft"] = True
+                        world.writes.clear()
+                    inspections = []
+                    def process(args, **kwargs):
+                        if args[:3] == ["gh", "pr", "view"]:
+                            inspections.append("inspect")
+                            if len(inspections) == failed_inspection:
+                                return subprocess.CompletedProcess(args, 0, payload, "private stderr")
+                        return world.run(args, **kwargs)
+                    with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                        result = publish(world.repo, world.candidate, world.policy, world.dependency)
+                    self.assertEqual(result, {
+                        "status": "hold", "reason": "publication_command_invalid_response",
+                        "head": world.candidate["head"], "base": world.candidate["base"],
+                        "diagnostic": {"operation": "inspect_pr", "exit_status": 0},
+                    })
+                    self.assertNotIn("private", json.dumps(result))
+                    self.assertEqual(inspections, ["inspect"] * failed_inspection)
+                    self.assertEqual(world.writes, [] if existing else ["branch", "create"])
+                    self.assertEqual(world.remote_sha, world.candidate["head"])
+                    self.assertTrue(world.pr["isDraft"])
+
     def test_exact_existing_candidate_is_reused_without_new_forge_writes(self):
         with tempfile.TemporaryDirectory() as temporary:
             world = HostedWorld(Path(temporary))
