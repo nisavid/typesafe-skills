@@ -3,6 +3,38 @@ description: Install locked CLI dependencies and the reviewed publication helper
 runs:
   using: composite
   steps:
+    - name: Remove image-installed system Git LFS filters
+      shell: bash
+      run: |
+        set -euo pipefail
+        read_lfs_names() {
+          local config_names config_name
+          config_names="$(sudo --non-interactive /usr/bin/git config --system --no-includes --name-only --list)" || return "$?"
+          while IFS= read -r config_name; do
+            case "$config_name" in
+              # Git variable names cannot contain dots; these are other subsections.
+              filter.lfs.*.*) ;;
+              filter.lfs.*) printf '%s\n' "$config_name" ;;
+            esac
+          done <<< "$config_names"
+        }
+        echo 'Inspecting system Git LFS filter names before normalization'
+        lfs_names="$(read_lfs_names)"
+        if [ -n "$lfs_names" ]; then
+          printf '%s\n' "$lfs_names"
+          lfs_names="$(printf '%s\n' "$lfs_names" | LC_ALL=C sort -u)"
+          while IFS= read -r lfs_name; do
+            sudo --non-interactive /usr/bin/git config --system --no-includes --unset-all "$lfs_name"
+          done <<< "$lfs_names"
+        fi
+        echo 'Verifying system Git LFS filter names after normalization'
+        lfs_names="$(read_lfs_names)"
+        if [ -n "$lfs_names" ]; then
+          printf '%s\n' "$lfs_names"
+          echo 'System Git LFS filters remain configured' >&2
+          exit 1
+        fi
+        echo 'System Git LFS filters are absent'
     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: '24'

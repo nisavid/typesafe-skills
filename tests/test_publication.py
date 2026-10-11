@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -142,6 +143,174 @@ class HostedWorld:
     def publish(self):
         with patch("subprocess.run", side_effect=self.run), patch("urllib.request.urlopen", side_effect=self.http):
             return publish(self.repo, self.candidate, self.policy, self.dependency)
+
+
+class RunnerGitSetupTests(unittest.TestCase):
+    """Execute the shared runner step against temporary system Git configuration."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.config = self.root / "system.gitconfig"
+        self.config.write_text('[safe]\n directory = *\n[filter "lfs"]\n clean = git-lfs clean -- %f\n'
+                               ' smudge = git-lfs smudge -- %f\n process = git-lfs filter-process\n required = true\n')
+        self.environment = {key: value for key, value in os.environ.items()
+                            if not key.startswith("GIT_") and key not in {"GH_TOKEN", "GH_READ_TOKEN", "TYPESAFE_API_KEY"}}
+        self.environment.update({"GIT_CONFIG_SYSTEM": str(self.config), "GIT_CONFIG_GLOBAL": os.devnull,
+                                 "PATH": str(self.root) + os.pathsep + os.environ["PATH"]})
+        # Replace privilege elevation only. Git still parses and edits the real
+        # temporary file; this wrapper cannot address the host system config.
+        sudo = self.root / "sudo"
+        sudo.write_text('#!' + sys.executable + '\n' + textwrap.dedent('''\
+            import os, subprocess, sys
+            from pathlib import Path
+            args = sys.argv[1:]
+            assert args[:3] == ["--non-interactive", "/usr/bin/git", "config"]
+            assert "--system" in args and "--no-includes" in args
+            config = Path(os.environ["GIT_CONFIG_SYSTEM"])
+            assert config.parent == Path(__file__).parent
+            if os.environ.get("TEST_LAUNCH_FAILURE"):
+                raise SystemExit(1)
+            if os.environ.get("TEST_FINAL_LAUNCH_FAILURE") and "filter" not in config.read_text():
+                raise SystemExit(1)
+            if "--unset-all" in args and os.environ.get("TEST_REMOVE_FAILURE"):
+                raise SystemExit(17)
+            if "--unset-all" in args and os.environ.get("TEST_REMOVE_NO_EFFECT"):
+                raise SystemExit(0)
+            if "--list" in args and os.environ.get("TEST_READ_FAILURE"):
+                raise SystemExit(23)
+            if "--list" in args and os.environ.get("TEST_VERIFY_FAILURE") and "filter" not in config.read_text():
+                raise SystemExit(24)
+            raise SystemExit(subprocess.run(args[1:]).returncode)
+            '''))
+        sudo.chmod(0o700)
+
+    def run_setup(self):
+        action = (Path(__file__).resolve().parents[1] / ".github/actions/setup-sync/action.yml").read_text()
+        marker = "    - name: Remove image-installed system Git LFS filters\n"
+        self.assertIn(marker, action, "shared setup must normalize the runner before credentials exist")
+        step = action.split(marker, 1)[1].split("    - ", 1)[0]
+        script = textwrap.dedent(step.split("      run: |\n", 1)[1])
+        return subprocess.run(["bash", "-euo", "pipefail", "-c", script], env=self.environment,
+                              capture_output=True, text=True, timeout=10)
+
+    def test_image_lfs_configuration_is_removed_without_changing_other_settings(self):
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_text(), '[safe]\n directory = *\n')
+
+    def test_runner_logs_filter_names_and_absence_without_values(self):
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("filter.lfs.clean", result.stdout)
+        self.assertIn("System Git LFS filters are absent", result.stdout)
+        self.assertNotIn("git-lfs clean --", result.stdout + result.stderr)
+
+    def test_runner_without_lfs_configuration_is_unchanged(self):
+        original = '[safe]\n directory = *\n[core]\n autocrlf = false\n'
+        self.config.write_text(original)
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_text(), original)
+
+    def test_empty_system_configuration_is_successfully_read_and_unchanged(self):
+        self.config.write_text("")
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("System Git LFS filters are absent", result.stdout)
+        self.assertEqual(self.config.read_text(), "")
+
+    def test_successful_removal_command_must_actually_remove_the_filters(self):
+        self.environment["TEST_REMOVE_NO_EFFECT"] = "1"
+        original = self.config.read_bytes()
+        self.assertNotEqual(self.run_setup().returncode, 0)
+        self.assertEqual(self.config.read_bytes(), original)
+
+    def test_malformed_system_config_stops_without_changes(self):
+        self.config.write_text('[broken\n')
+        self.assertNotEqual(self.run_setup().returncode, 0)
+        self.assertEqual(self.config.read_text(), '[broken\n')
+
+    def test_read_and_removal_errors_are_not_treated_as_absence(self):
+        original = self.config.read_bytes()
+        for variable, status in (("TEST_READ_FAILURE", 23), ("TEST_REMOVE_FAILURE", 17)):
+            with self.subTest(variable=variable):
+                self.environment[variable] = "1"
+                try:
+                    self.assertEqual(self.run_setup().returncode, status)
+                    self.assertEqual(self.config.read_bytes(), original)
+                finally:
+                    del self.environment[variable]
+
+    def test_unreadable_verification_stops_setup(self):
+        self.environment["TEST_VERIFY_FAILURE"] = "1"
+        self.assertEqual(self.run_setup().returncode, 24)
+
+    def test_initial_privileged_launcher_failure_is_not_absence(self):
+        self.environment["TEST_LAUNCH_FAILURE"] = "1"
+        original = self.config.read_bytes()
+        result = self.run_setup()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("System Git LFS filters are absent", result.stdout)
+        self.assertEqual(self.config.read_bytes(), original)
+
+    def test_final_privileged_launcher_failure_is_not_verified_absence(self):
+        self.environment["TEST_FINAL_LAUNCH_FAILURE"] = "1"
+        result = self.run_setup()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("System Git LFS filters are absent", result.stdout)
+        self.assertEqual(self.config.read_text(), '[safe]\n directory = *\n')
+
+    def test_uppercase_section_and_key_names_are_removed_but_other_subsections_remain(self):
+        preserved = '[safe]\n directory = *\n[filter "LFS"]\n clean = keep-uppercase-subsection\n'
+        self.config.write_text(preserved + '[FILTER "lfs"]\n CLEAN = git-lfs clean -- %f\n')
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_text(), preserved)
+        self.assertIn("System Git LFS filters are absent", result.stdout)
+
+    def test_mixed_case_duplicate_sections_and_keys_are_all_removed(self):
+        preserved = '[safe]\n directory = *\n[filter "LFS"]\n clean = keep-uppercase-subsection\n'
+        self.config.write_text(preserved + '[filter "lfs"]\n clean = first\n required = true\n'
+                               '[FILTER "lfs"]\n CLEAN = second\n SMUDGE = third\n'
+                               '[FiLtEr "lfs"]\n Clean = fourth\n REQUIRED = false\n')
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_text(), preserved)
+        self.assertIn("System Git LFS filters are absent", result.stdout)
+
+    def test_dotted_subsection_is_preserved(self):
+        preserved = '[filter "lfs.extra"]\n clean = keep-dotted-subsection\n'
+        self.config.write_text(preserved + '[FILTER "lfs"]\n CLEAN = remove\n')
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_text(), preserved)
+        self.assertIn("System Git LFS filters are absent", result.stdout)
+
+    def test_duplicate_lfs_sections_are_removed(self):
+        with self.config.open("a") as config:
+            config.write('[filter "lfs"]\n required = true\n')
+        self.assertEqual(self.run_setup().returncode, 0)
+        self.assertEqual(self.config.read_text(), '[safe]\n directory = *\n')
+
+    def test_runner_setup_unblocks_publication_without_weakening_other_filter_guard(self):
+        with patch.dict(os.environ, self.environment, clear=True):
+            world = HostedWorld(self.root)
+            self.assertEqual(world.publish()["reason"], "publication_git_configuration_requires_isolation")
+            self.assertEqual(world.writes, [])
+            self.assertEqual(self.run_setup().returncode, 0)
+            self.assertEqual(world.publish()["status"], "published")
+
+    def test_unrelated_system_filters_still_hold_publication(self):
+        with self.config.open("a") as config:
+            config.write('[filter "other"]\n clean = false\n')
+        with patch.dict(os.environ, self.environment, clear=True):
+            world = HostedWorld(self.root)
+            self.assertEqual(self.run_setup().returncode, 0)
+            self.assertEqual(self.config.read_text(), '[safe]\n directory = *\n[filter "other"]\n clean = false\n')
+            self.assertEqual(world.publish()["reason"], "publication_git_configuration_requires_isolation")
+            self.assertEqual(world.writes, [])
 
 
 class PublicationTests(unittest.TestCase):
