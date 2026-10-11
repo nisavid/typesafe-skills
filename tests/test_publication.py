@@ -59,7 +59,10 @@ class HostedWorld:
     def run(self, args, **kwargs):
         args = [str(arg) for arg in args]
         def output(value, code=0):
-            return subprocess.CompletedProcess(args, code, value if isinstance(value, str) else json.dumps(value), "")
+            stdout = value if isinstance(value, str) else json.dumps(value)
+            if kwargs.get("text"):
+                return subprocess.CompletedProcess(args, code, stdout, "")
+            return subprocess.CompletedProcess(args, code, stdout.encode("utf-8"), b"")
         def arg(flag):
             return args[args.index(flag) + 1]
         if args[0] == "git":
@@ -404,7 +407,7 @@ class PublicationTests(unittest.TestCase):
             secret = "synthetic-credential-that-must-not-appear"
             def process(args, **kwargs):
                 if Path(str(args[1])).name == "execute_git_publication.py":
-                    return subprocess.CompletedProcess(args, 17, secret, secret)
+                    return subprocess.CompletedProcess(args, 17, secret.encode(), secret.encode())
                 return world.run(args, **kwargs)
             with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
                 result = publish(world.repo, world.candidate, world.policy, world.dependency)
@@ -416,12 +419,61 @@ class PublicationTests(unittest.TestCase):
             self.assertNotIn(secret, json.dumps(result))
             self.assertEqual(world.writes, [])
 
+    def test_undecodable_create_output_preserves_status_and_prior_effects(self):
+        for status, stream in ((17, 1), (17, 2), (0, 1)):
+            with self.subTest(status=status, stream=stream), tempfile.TemporaryDirectory() as temporary:
+                world = HostedWorld(Path(temporary))
+                attempts = []
+                def process(args, **kwargs):
+                    result = world.run(args, **kwargs)
+                    if Path(str(args[1])).name == "create_reviewable_pr.py":
+                        attempts.append("create")
+                        # Real byte output exercises subprocess decoding, after
+                        # the controlled forge has already created its draft.
+                        script = (f"import os; os.write({stream}, b'private-output-' + bytes([255])); "
+                                  f"raise SystemExit({status})")
+                        return world.real_run([sys.executable, "-c", script], **kwargs)
+                    return result
+                with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                    result = publish(world.repo, world.candidate, world.policy, world.dependency)
+                reason = "publication_command_failed_or_outcome_unknown" if status else "publication_command_invalid_response"
+                self.assertEqual(result, {
+                    "status": "hold", "reason": reason,
+                    "head": world.candidate["head"], "base": world.candidate["base"],
+                    "diagnostic": {"operation": "create_pr", "exit_status": status},
+                })
+                self.assertEqual(attempts, ["create"])
+                self.assertEqual(world.writes, ["branch", "create"])
+                self.assertEqual(world.remote_sha, world.candidate["head"])
+                self.assertTrue(world.pr["isDraft"])
+                self.assertNotIn("private-output", json.dumps(result))
+
+    def test_valid_create_response_with_undecodable_unused_stderr_can_publish(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            world = HostedWorld(Path(temporary))
+            attempts = []
+            def process(args, **kwargs):
+                result = world.run(args, **kwargs)
+                if Path(str(args[1])).name == "create_reviewable_pr.py":
+                    attempts.append("create")
+                    script = ("import os; os.write(1, b'{\"status\": \"verified\", \"pr\": 42}'); "
+                              "os.write(2, b'private-stderr-' + bytes([255]))")
+                    return world.real_run([sys.executable, "-c", script], **kwargs)
+                return result
+            with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                result = publish(world.repo, world.candidate, world.policy, world.dependency)
+            self.assertEqual(result["status"], "published", result)
+            self.assertEqual(attempts, ["create"])
+            self.assertEqual(world.writes, ["branch", "create", "ready"])
+            self.assertFalse(world.pr["isDraft"])
+            self.assertNotIn("private-stderr", json.dumps(result))
+
     def test_failed_candidate_fetch_is_distinguishable_from_publication(self):
         with tempfile.TemporaryDirectory() as temporary:
             world = HostedWorld(Path(temporary))
             def process(args, **kwargs):
                 if args[0] == "git" and "fetch" in args:
-                    return subprocess.CompletedProcess(args, 128, "private output", "private path")
+                    return subprocess.CompletedProcess(args, 128, b"private output", b"private path")
                 return world.run(args, **kwargs)
             with patch("subprocess.run", side_effect=process):
                 result = publish(world.repo, world.candidate, world.policy, world.dependency)
@@ -435,7 +487,7 @@ class PublicationTests(unittest.TestCase):
             world = HostedWorld(Path(temporary))
             def process(args, **kwargs):
                 if args[:3] == ["gh", "pr", "list"]:
-                    return subprocess.CompletedProcess(args, 0, "private non-JSON response", "private stderr")
+                    return subprocess.CompletedProcess(args, 0, b"private non-JSON response", b"private stderr")
                 return world.run(args, **kwargs)
             with patch("subprocess.run", side_effect=process):
                 result = publish(world.repo, world.candidate, world.policy, world.dependency)
@@ -451,7 +503,7 @@ class PublicationTests(unittest.TestCase):
             def process(args, **kwargs):
                 if Path(str(args[1])).name == "plan_git_publication.py":
                     attempts.append("plan")
-                    return subprocess.CompletedProcess(args, 0, "private malformed plan", "private stderr")
+                    return subprocess.CompletedProcess(args, 0, b"private malformed plan", b"private stderr")
                 return world.run(args, **kwargs)
             with patch("subprocess.run", side_effect=process):
                 result = publish(world.repo, world.candidate, world.policy, world.dependency)
@@ -473,7 +525,7 @@ class PublicationTests(unittest.TestCase):
                     if Path(str(args[1])).name == "audit_reviewable_pr.py":
                         commands.append(args[2])
                         if args[2] == failed_command:
-                            return subprocess.CompletedProcess(args, 17, "private output", "private stderr")
+                            return subprocess.CompletedProcess(args, 17, b"private output", b"private stderr")
                     return world.run(args, **kwargs)
                 with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
                     result = publish(world.repo, world.candidate, world.policy, world.dependency)
@@ -495,7 +547,7 @@ class PublicationTests(unittest.TestCase):
                 def process(args, **kwargs):
                     if Path(str(args[1])).name == "plan_git_publication.py":
                         attempts.append("plan")
-                        return subprocess.CompletedProcess(args, 0, payload, "private stderr")
+                        return subprocess.CompletedProcess(args, 0, payload.encode(), b"private stderr")
                     return world.run(args, **kwargs)
                 with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
                     result = publish(world.repo, world.candidate, world.policy, world.dependency)
@@ -524,7 +576,7 @@ class PublicationTests(unittest.TestCase):
                         if args[:3] == ["gh", "pr", "view"]:
                             inspections.append("inspect")
                             if len(inspections) == failed_inspection:
-                                return subprocess.CompletedProcess(args, 0, payload, "private stderr")
+                                return subprocess.CompletedProcess(args, 0, payload.encode(), b"private stderr")
                         return world.run(args, **kwargs)
                     with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
                         result = publish(world.repo, world.candidate, world.policy, world.dependency)
@@ -694,7 +746,7 @@ p.write_text(json.dumps(state))
                 if Path(args[1]).name == "plan_git_publication.py" and not result.returncode:
                     self.assertEqual(json.loads(result.stdout)["status"], "ready", result.stdout)
                 if result.returncode:
-                    raise AssertionError("Real helper failed: " + result.stdout + result.stderr)
+                    raise AssertionError(f"Real helper failed: {result.stdout!r} {result.stderr!r}")
                 return result
             environment = {"PATH": str(root) + os.pathsep + os.environ["PATH"], "FAKE_FORGE_STATE": str(state)}
             def page(request, **kwargs):

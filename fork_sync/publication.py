@@ -44,20 +44,28 @@ def _sha(text):
 def _run(arguments, repo, env, *, operation, json_output=False, input_text=None):
     try:
         result = subprocess.run([str(arg) for arg in arguments], cwd=repo, env=env,
-                                input=input_text, capture_output=True, text=True, timeout=90)
+                                input=input_text.encode("utf-8") if input_text is not None else None,
+                                capture_output=True, timeout=90)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise Hold("publication_command_outcome_unknown", operation=operation) from error
     if result.returncode:
         # Command diagnostics may contain forge text or credential-helper output.
         raise Hold("publication_command_failed_or_outcome_unknown", operation=operation,
                    exit_status=result.returncode)
+    # Unused stderr is deliberately discarded without decoding. Decode only
+    # required stdout, after preserving the completed process's exit status.
+    try:
+        stdout = result.stdout.decode("utf-8", "strict")
+    except UnicodeDecodeError as error:
+        raise Hold("publication_command_invalid_response", operation=operation,
+                   exit_status=result.returncode) from error
     if json_output:
         try:
-            return json.loads(result.stdout)
+            return json.loads(stdout)
         except (ValueError, TypeError) as error:
             raise Hold("publication_command_invalid_response", operation=operation,
                        exit_status=0) from error
-    return result.stdout
+    return stdout
 
 
 def _git(repo, env, *arguments, operation):
