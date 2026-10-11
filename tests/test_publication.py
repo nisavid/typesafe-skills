@@ -9,6 +9,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from fork_sync.controller import reconcile
+from fork_sync.git_candidate import construct
 from fork_sync.publication import publish
 
 
@@ -335,6 +337,152 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(result["status"], "hold")
         self.assertEqual(result["reason"], "invalid_publication_input")
 
+    def test_controller_retains_invalid_helper_response_after_draft_creation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            world = HostedWorld(root)
+            anchor, upstream = world.candidate["base"], world.candidate["upstream"]
+            world.policy.update(upstream_anchor=anchor, owned_paths=[".agents/fork-sync.json"],
+                                jev_questions={})
+            policy_bytes = (json.dumps(world.policy, indent=2) + "\n").encode()
+            world.git(world.repo, "checkout", "--detach", anchor)
+            (world.repo / ".agents").mkdir()
+            (world.repo / ".agents/fork-sync.json").write_bytes(policy_bytes)
+            world.git(world.repo, "add", ".agents/fork-sync.json")
+            world.git(world.repo, "commit", "-m", "fork policy")
+            base = world.git(world.repo, "rev-parse", "HEAD")
+            world.candidate = construct(world.repo, base, upstream, world.policy)
+            self.assertEqual(world.candidate["status"], "candidate")
+            world.branch = "nisavid/upstream-sync/" + upstream[:12] + "-" + base[:12]
+            attempts = []
+
+            def process(args, **kwargs):
+                self.assertEqual(attempts, [], "No operation may follow the invalid response")
+                result = world.run(args, **kwargs)
+                if Path(str(args[1])).name == "create_reviewable_pr.py":
+                    attempts.append("create")
+                    return subprocess.CompletedProcess(args, 0, b"null", b"private stderr")
+                return result
+
+            def page(*args, **kwargs):
+                self.assertEqual(attempts, [], "No HTTP operation may follow the invalid response")
+                return world.http(*args, **kwargs)
+
+            evidence = root / "evidence"
+            with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=page):
+                result = reconcile(world.repo, base, upstream, policy_bytes, world.dependency,
+                                   evidence_dir=evidence)
+            self.assertEqual(result, {
+                "status": "hold", "reason": "publication_command_invalid_response",
+                "head": world.candidate["head"], "base": base,
+                "diagnostic": {"operation": "create_pr", "exit_status": 0},
+            })
+            self.assertEqual(json.loads((evidence / "result.json").read_text()), result)
+            self.assertEqual(attempts, ["create"])
+            self.assertEqual(world.writes, ["branch", "create"])
+            self.assertEqual(world.remote_sha, world.candidate["head"])
+            self.assertTrue(world.pr["isDraft"])
+
+    def test_non_object_helper_responses_hold_after_preserving_prior_effects(self):
+        cases = (
+            ("execute_git_publication.py", None, "publish_branch", False, ["branch"], None),
+            ("create_reviewable_pr.py", None, "create_pr", False, ["branch", "create"], True),
+            ("audit_reviewable_pr.py", "reconcile", "reconcile_pr", True, [], True),
+            ("update_reviewable_pr.py", "ready", "mark_pr_ready", False, ["branch", "create", "ready"], False),
+            ("audit_reviewable_pr.py", "audit", "audit_pr", False, ["branch", "create", "ready"], False),
+            ("audit_reviewable_pr.py", "audit", "audit_pr", True, ["ready"], False),
+        )
+        for helper, command, operation, existing, writes, draft in cases:
+            for payload in ("null", '["private response"]', '"private response"', "17", "true"):
+                with self.subTest(operation=operation, existing=existing, payload=payload), tempfile.TemporaryDirectory() as temporary:
+                    world = HostedWorld(Path(temporary))
+                    if existing:
+                        self.assertEqual(world.publish()["status"], "published")
+                        world.pr["isDraft"] = True
+                        world.writes.clear()
+                    attempts = []
+
+                    def process(args, **kwargs):
+                        self.assertEqual(attempts, [], "No operation may follow the invalid response")
+                        result = world.run(args, **kwargs)
+                        if Path(str(args[1])).name == helper and (command is None or args[2] == command):
+                            attempts.append(operation)
+                            return subprocess.CompletedProcess(args, 0, payload.encode(), b"private stderr")
+                        return result
+
+                    def page(*args, **kwargs):
+                        self.assertEqual(attempts, [], "No HTTP operation may follow the invalid response")
+                        return world.http(*args, **kwargs)
+
+                    with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=page):
+                        result = publish(world.repo, world.candidate, world.policy, world.dependency)
+                    self.assertEqual(result, {
+                        "status": "hold", "reason": "publication_command_invalid_response",
+                        "head": world.candidate["head"], "base": world.candidate["base"],
+                        "diagnostic": {"operation": operation, "exit_status": 0},
+                    })
+                    self.assertEqual(attempts, [operation])
+                    self.assertEqual(world.writes, writes)
+                    self.assertEqual(world.remote_sha, world.candidate["head"])
+                    if draft is None:
+                        self.assertIsNone(world.pr)
+                    else:
+                        self.assertEqual(world.pr["isDraft"], draft)
+
+    def test_wrong_observation_shapes_hold_before_publication(self):
+        for operation in ("find_candidate_pr", "observe_diff", "observe_history"):
+            wrong_container = '["private response"]' if operation == "observe_history" else '{"private": "response"}'
+            for payload in ("null", wrong_container, '"private response"', "17", "true"):
+                with self.subTest(operation=operation, payload=payload), tempfile.TemporaryDirectory() as temporary:
+                    world = HostedWorld(Path(temporary), history_only="empty" if operation == "observe_history" else None)
+                    attempts = []
+
+                    def process(args, **kwargs):
+                        self.assertEqual(attempts, [], "No operation may follow the invalid response")
+                        is_listing = args[:3] == ["gh", "pr", "list"]
+                        is_diff = "-c" in args and "observe_git_diff" in str(args[args.index("-c") + 1])
+                        is_history = "-c" in args and "observe_git_history" in str(args[args.index("-c") + 1])
+                        if operation == "observe_history" and is_diff:
+                            return subprocess.CompletedProcess(args, 0, b"[]", b"")
+                        if (operation == "find_candidate_pr" and is_listing or
+                                operation == "observe_diff" and is_diff or
+                                operation == "observe_history" and is_history):
+                            attempts.append(operation)
+                            return subprocess.CompletedProcess(args, 0, payload.encode(), b"private stderr")
+                        return world.run(args, **kwargs)
+
+                    def page(*args, **kwargs):
+                        self.fail("An invalid observation must stop before HTTP navigation checks")
+
+                    with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=page):
+                        result = publish(world.repo, world.candidate, world.policy, world.dependency)
+                    self.assertEqual(result, {
+                        "status": "hold", "reason": "publication_command_invalid_response",
+                        "head": world.candidate["head"], "base": world.candidate["base"],
+                        "diagnostic": {"operation": operation, "exit_status": 0},
+                    })
+                    self.assertEqual(attempts, [operation])
+                    self.assertEqual(world.writes, [])
+                    self.assertIsNone(world.remote_sha)
+                    self.assertIsNone(world.pr)
+
+    def test_multiple_prs_remain_a_semantic_ambiguity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            world = HostedWorld(Path(temporary))
+
+            def process(args, **kwargs):
+                if args[:3] == ["gh", "pr", "list"]:
+                    return subprocess.CompletedProcess(args, 0, b"[{}, {}]", b"")
+                return world.run(args, **kwargs)
+
+            with patch("subprocess.run", side_effect=process):
+                result = publish(world.repo, world.candidate, world.policy, world.dependency)
+            self.assertEqual(result, {
+                "status": "hold", "reason": "ambiguous_candidate_pr",
+                "head": world.candidate["head"], "base": world.candidate["base"],
+            })
+            self.assertEqual(world.writes, [])
+
     def test_candidate_is_published_ready_with_checked_live_navigation(self):
         with tempfile.TemporaryDirectory() as temporary:
             world = HostedWorld(Path(temporary))
@@ -540,7 +688,7 @@ class PublicationTests(unittest.TestCase):
                 self.assertEqual(world.pr["isDraft"], failed_command == "reconcile")
 
     def test_non_object_planner_response_holds_before_publication(self):
-        for payload in ("null", "[]", '"private response"'):
+        for payload in ("null", "[]", '"private response"', "17", "true"):
             with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temporary:
                 world = HostedWorld(Path(temporary))
                 attempts = []
@@ -564,7 +712,7 @@ class PublicationTests(unittest.TestCase):
 
     def test_non_object_pr_inspections_hold_without_readiness_or_retry(self):
         for existing, failed_inspection in ((False, 1), (True, 1), (True, 2)):
-            for payload in ("null", "[]", '"private response"'):
+            for payload in ("null", "[]", '"private response"', "17", "true"):
                 with self.subTest(existing=existing, inspection=failed_inspection, payload=payload), tempfile.TemporaryDirectory() as temporary:
                     world = HostedWorld(Path(temporary))
                     if existing:
