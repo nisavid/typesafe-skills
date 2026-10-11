@@ -287,8 +287,11 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
         operation = operations[name]
         if name == "audit_reviewable_pr.py" and arguments[0] == "reconcile":
             operation = "reconcile_pr"
-        return _run([sys.executable, directory / name, *arguments], repo, env,
-                    operation=operation, json_output=structured)
+        result = _run([sys.executable, directory / name, *arguments], repo, env,
+                      operation=operation, json_output=structured)
+        if structured and not isinstance(result, dict):
+            raise Hold("publication_command_invalid_response", operation=operation, exit_status=0)
+        return result
     read_env = dict(env)
     if env.get("GH_READ_TOKEN"):
         read_env["GH_TOKEN"] = env["GH_READ_TOKEN"]
@@ -303,7 +306,9 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
                 "--head-owner", owner, "--head-repository", repository]
     prs = _run(["gh", "pr", "list", "--repo", repository, "--state", "all", "--base", target,
                 "--head", branch, "--limit", "100", "--json", FIELDS], repo, read_env, operation="find_candidate_pr", json_output=True)
-    if not isinstance(prs, list) or len(prs) > 1:
+    if not isinstance(prs, list):
+        raise Hold("publication_command_invalid_response", operation="find_candidate_pr", exit_status=0)
+    if len(prs) > 1:
         raise Hold("ambiguous_candidate_pr")
     if prs and (prs[0]["state"] != "OPEN" or prs[0]["headRefOid"] != candidate["head"]):
         raise Hold("candidate_pr_collision")
@@ -312,6 +317,8 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
                  "from change_navigation.git_observer import observe_git_diff; "
                  "print(json.dumps(observe_git_diff(Path(sys.argv[2]),base_oid=sys.argv[3],head_oid=sys.argv[4])))",
                  writer, repo, candidate["base"], candidate["head"]], repo, env, operation="observe_diff", json_output=True)
+    if not isinstance(rows, list):
+        raise Hold("publication_command_invalid_response", operation="observe_diff", exit_status=0)
     if (len(rows) > 100 or sorted(row["target_path"] for row in rows) != sorted(candidate["changed_paths"])):
         raise Hold("publication_diff_outside_template_contract")
     history = None
@@ -321,6 +328,8 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
                         "from change_navigation.git_observer import observe_git_history; "
                         "print(json.dumps(observe_git_history(Path(sys.argv[2]),base_oid=sys.argv[3],head_oid=sys.argv[4])))",
                         writer, repo, candidate["base"], candidate["head"]], repo, env, operation="observe_history", json_output=True)
+        if not isinstance(history, dict):
+            raise Hold("publication_command_invalid_response", operation="observe_history", exit_status=0)
         if not history["head_only_commits"]:
             raise Hold("publication_history_outside_template_contract")
     title = "chore(sync): import upstream " + candidate["upstream"][:12]
