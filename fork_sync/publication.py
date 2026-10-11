@@ -31,30 +31,37 @@ TAXONOMY = ("IMPL means non-test source and configuration. TEST means automated 
 class Hold(Exception):
     """A redacted reason suitable for operator-visible workflow output."""
 
+    def __init__(self, reason, *, operation=None, exit_status=None):
+        super().__init__(reason)
+        self.diagnostic = ({"operation": operation, "exit_status": exit_status}
+                           if operation is not None else None)
+
 
 def _sha(text):
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def _run(arguments, repo, env, *, json_output=False, input_text=None):
+def _run(arguments, repo, env, *, operation, json_output=False, input_text=None):
     try:
         result = subprocess.run([str(arg) for arg in arguments], cwd=repo, env=env,
                                 input=input_text, capture_output=True, text=True, timeout=90)
     except (OSError, subprocess.TimeoutExpired) as error:
-        raise Hold("publication_command_outcome_unknown") from error
+        raise Hold("publication_command_outcome_unknown", operation=operation) from error
     if result.returncode:
         # Command diagnostics may contain forge text or credential-helper output.
-        raise Hold("publication_command_failed_or_outcome_unknown")
+        raise Hold("publication_command_failed_or_outcome_unknown", operation=operation,
+                   exit_status=result.returncode)
     if json_output:
         try:
             return json.loads(result.stdout)
         except (ValueError, TypeError) as error:
-            raise Hold("publication_command_invalid_response") from error
+            raise Hold("publication_command_invalid_response", operation=operation,
+                       exit_status=0) from error
     return result.stdout
 
 
-def _git(repo, env, *arguments):
-    return _run(["git", "-C", repo, *arguments], repo, env).strip()
+def _git(repo, env, *arguments, operation):
+    return _run(["git", "-C", repo, *arguments], repo, env, operation=operation).strip()
 
 
 def _write(path, value):
@@ -63,7 +70,7 @@ def _write(path, value):
 
 
 def _remote_ref(repo, env, ref):
-    lines = _git(repo, env, "ls-remote", "--refs", "origin", ref).splitlines()
+    lines = _git(repo, env, "ls-remote", "--refs", "origin", ref, operation="inspect_remote_ref").splitlines()
     if not lines:
         return None
     if len(lines) != 1 or not re.fullmatch(r"[0-9a-f]{40}\t" + re.escape(ref), lines[0]):
@@ -242,17 +249,17 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
     target = policy["target_branch"]
     branch = policy["candidate_prefix"] + candidate["upstream"][:12] + "-" + candidate["base"][:12]
     ref = "refs/heads/" + branch
-    _git(repo, env, "check-ref-format", ref)
-    _git(repo, env, "check-ref-format", "refs/heads/" + target)
-    if branch == target or _git(provingkit, env, "rev-parse", "HEAD") != policy["provingkit_pin"]:
+    _git(repo, env, "check-ref-format", ref, operation="validate_candidate_ref")
+    _git(repo, env, "check-ref-format", "refs/heads/" + target, operation="validate_target_ref")
+    if branch == target or _git(provingkit, env, "rev-parse", "HEAD", operation="inspect_helper_revision") != policy["provingkit_pin"]:
         raise Hold("dependency_or_destination_drift")
     for directory in (repo, provingkit):
-        if _git(directory, env, "status", "--porcelain=v1", "--untracked-files=all"):
+        if _git(directory, env, "status", "--porcelain=v1", "--untracked-files=all", operation="inspect_publication_worktree"):
             raise Hold("dirty_publication_input")
-    if (_git(repo, env, "rev-parse", "HEAD") != candidate["head"] or
-            _git(repo, env, "rev-parse", candidate["head"] + "^{tree}") != candidate["tree"]):
+    if (_git(repo, env, "rev-parse", "HEAD", operation="inspect_candidate_revision") != candidate["head"] or
+            _git(repo, env, "rev-parse", candidate["head"] + "^{tree}", operation="inspect_candidate_tree") != candidate["tree"]):
         raise Hold("candidate_checkout_drift")
-    if _git(repo, env, "remote", "get-url", "--push", "--all", "origin") != f"https://github.com/{repository}.git":
+    if _git(repo, env, "remote", "get-url", "--push", "--all", "origin", operation="inspect_origin") != f"https://github.com/{repository}.git":
         raise Hold("publication_origin_mismatch")
     if _remote_ref(repo, env, "refs/heads/" + target) != candidate["base"]:
         raise Hold("publication_base_moved")
@@ -263,7 +270,14 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
     writer = provingkit / "plugins/mergecraft/skills/writing-reviewable-pr-descriptions/scripts"
     versionkeeping = provingkit / "plugins/versionkeeping/skills/checkpointing-and-publishing-git-work/scripts"
     def helper(directory, name, *arguments, structured=True):
-        return _run([sys.executable, directory / name, *arguments], repo, env, json_output=structured)
+        operations = {"validate_change_navigation.py": "validate_navigation",
+                      "plan_git_publication.py": "plan_branch_publication",
+                      "execute_git_publication.py": "publish_branch",
+                      "create_reviewable_pr.py": "create_pr",
+                      "update_reviewable_pr.py": "mark_pr_ready",
+                      "audit_reviewable_pr.py": "audit_pr"}
+        return _run([sys.executable, directory / name, *arguments], repo, env,
+                    operation=operations[name], json_output=structured)
     read_env = dict(env)
     if env.get("GH_READ_TOKEN"):
         read_env["GH_TOKEN"] = env["GH_READ_TOKEN"]
@@ -271,7 +285,7 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
                 "--head", owner + ":" + branch, "--head-oid", candidate["head"],
                 "--head-owner", owner, "--head-repository", repository]
     prs = _run(["gh", "pr", "list", "--repo", repository, "--state", "all", "--base", target,
-                "--head", branch, "--limit", "100", "--json", FIELDS], repo, read_env, json_output=True)
+                "--head", branch, "--limit", "100", "--json", FIELDS], repo, read_env, operation="find_candidate_pr", json_output=True)
     if not isinstance(prs, list) or len(prs) > 1:
         raise Hold("ambiguous_candidate_pr")
     if prs and (prs[0]["state"] != "OPEN" or prs[0]["headRefOid"] != candidate["head"]):
@@ -280,7 +294,7 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
                  "import sys,json; from pathlib import Path; sys.path.insert(0,sys.argv[1]); "
                  "from change_navigation.git_observer import observe_git_diff; "
                  "print(json.dumps(observe_git_diff(Path(sys.argv[2]),base_oid=sys.argv[3],head_oid=sys.argv[4])))",
-                 writer, repo, candidate["base"], candidate["head"]], repo, env, json_output=True)
+                 writer, repo, candidate["base"], candidate["head"]], repo, env, operation="observe_diff", json_output=True)
     if (len(rows) > 100 or sorted(row["target_path"] for row in rows) != sorted(candidate["changed_paths"])):
         raise Hold("publication_diff_outside_template_contract")
     history = None
@@ -289,7 +303,7 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
                         "import sys,json; from pathlib import Path; sys.path.insert(0,sys.argv[1]); "
                         "from change_navigation.git_observer import observe_git_history; "
                         "print(json.dumps(observe_git_history(Path(sys.argv[2]),base_oid=sys.argv[3],head_oid=sys.argv[4])))",
-                        writer, repo, candidate["base"], candidate["head"]], repo, env, json_output=True)
+                        writer, repo, candidate["base"], candidate["head"]], repo, env, operation="observe_history", json_output=True)
         if not history["head_only_commits"]:
             raise Hold("publication_history_outside_template_contract")
     title = "chore(sync): import upstream " + candidate["upstream"][:12]
@@ -297,11 +311,11 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
     body, diff = _body(repository, candidate, rows, number, policy.get("publication_categories", {}))
     baseline = {"mode": "new", "title_sha256": None, "body_sha256": None, "fragments": []}
     if prs:
-        live = _run(["gh", "pr", "view", str(number), "--repo", repository, "--json", FIELDS], repo, read_env, json_output=True)
+        live = _run(["gh", "pr", "view", str(number), "--repo", repository, "--json", FIELDS], repo, read_env, operation="inspect_pr", json_output=True)
         prefix = _run([sys.executable, "-I", "-c",
                        "import sys; sys.path.insert(0,sys.argv[1]); from change_navigation.bot_body import authored_body; "
                        "sys.stdout.write(authored_body(sys.stdin.read(),expected_sha256=sys.argv[2]))",
-                       writer, _sha(body)], repo, env, input_text=live["body"])
+                       writer, _sha(body)], repo, env, operation="verify_authored_body", input_text=live["body"])
         if live["title"] != title or prefix != body:
             raise Hold("existing_pr_text_drift")
         baseline = {"mode": "existing", "title_sha256": _sha(title), "body_sha256": _sha(body),
@@ -325,14 +339,18 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
            "--git-repository", repo, "--review-input", manifest_path,
            *(["--template-body", body_path] if not prs else []), rendered_path, structured=False)
     if not remote:
-        adopted = sorted(_git(repo, env, "rev-list", candidate["base"] + ".." + candidate["upstream"]).splitlines())
+        adopted = sorted(_git(repo, env, "rev-list", candidate["base"] + ".." + candidate["upstream"], operation="inspect_adopted_history").splitlines())
         request = {"schema_version": 2, "start_head": candidate["base"], "source_sha": candidate["head"],
                    "task_owned_commits": [candidate["head"]], "adopted_commits": adopted,
                    "removal_authorized_commits": [], "explicit_destination": {"remote": "origin", "ref": ref},
                    "default_branch_policy": None, "allow_create": True, "creation_base_ref": "refs/heads/" + target}
         request_path = _write(temporary / "request.json", request)
         plan_raw = helper(versionkeeping, "plan_git_publication.py", "--repo", repo, "--request", request_path, structured=False)
-        plan = json.loads(plan_raw)
+        try:
+            plan = json.loads(plan_raw)
+        except ValueError as error:
+            raise Hold("invalid_publication_response_or_input",
+                       operation="plan_branch_publication", exit_status=0) from error
         push, destination = plan.get("push", {}), plan.get("destination", {})
         if (plan.get("status") != "ready" or plan.get("request") != request or plan.get("source_sha") != candidate["head"] or
                 destination.get("remote") != "origin" or destination.get("ref") != ref or destination.get("default_branch_ref") == ref or
@@ -355,7 +373,7 @@ def _publish(repo, candidate, policy, provingkit, temporary, env):
         if created.get("status") != "verified" or not isinstance(created.get("pr"), int):
             raise Hold("pr_creation_unverified")
         number = created["pr"]
-    live = _run(["gh", "pr", "view", str(number), "--repo", repository, "--json", FIELDS], repo, read_env, json_output=True)
+    live = _run(["gh", "pr", "view", str(number), "--repo", repository, "--json", FIELDS], repo, read_env, operation="inspect_pr", json_output=True)
     url = f"https://github.com/{repository}/pull/{number}"
     if (live.get("url") != url or live.get("state") != "OPEN" or live.get("headRefOid") != candidate["head"] or
             live.get("baseRefOid") != candidate["base"] or live.get("baseRefName") != target or
@@ -404,14 +422,14 @@ def publish(repo: Path, candidate: dict, policy: dict, provingkit: Path) -> dict
             root = Path(temporary)
             env["XDG_STATE_HOME"] = str(root / "state")
             repo = repo.resolve()
-            config_names = _git(repo, env, "config", "--name-only", "--list").lower().splitlines()
+            config_names = _git(repo, env, "config", "--name-only", "--list", operation="inspect_git_configuration").lower().splitlines()
             if any(name.startswith(("filter.", "include.", "includeif.")) or
                    name == "core.fsmonitor" for name in config_names):
                 raise Hold("publication_git_configuration_requires_isolation")
-            if _git(repo, env, "status", "--porcelain=v1", "--untracked-files=all"):
+            if _git(repo, env, "status", "--porcelain=v1", "--untracked-files=all", operation="inspect_controller_worktree"):
                 raise Hold("dirty_publication_input")
             origin = f"https://github.com/{policy['repository']}.git"
-            if _git(repo, env, "remote", "get-url", "--push", "--all", "origin") != origin:
+            if _git(repo, env, "remote", "get-url", "--push", "--all", "origin", operation="inspect_origin") != origin:
                 raise Hold("publication_origin_mismatch")
             # The writer requires HEAD at the PR candidate. Materialize only a
             # disposable data checkout; the executing controller never moves.
@@ -423,17 +441,20 @@ def publish(repo: Path, candidate: dict, policy: dict, provingkit: Path) -> dict
             checkout_env = {key: value for key, value in env.items() if not key.startswith("GIT_")}
             checkout_env.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
                                  "GIT_TERMINAL_PROMPT": "0", "GIT_NO_REPLACE_OBJECTS": "1"})
-            _git(data, checkout_env, "init", "--template=" + str(template))
+            _git(data, checkout_env, "init", "--template=" + str(template), operation="initialize_candidate")
             for key, value in (("submodule.recurse", "false"), ("core.autocrlf", "false")):
-                _git(data, checkout_env, "config", key, value)
+                _git(data, checkout_env, "config", key, value, operation="configure_candidate")
             _git(data, checkout_env, "-c", "protocol.file.allow=always", "fetch", "--no-tags",
-                 "--no-recurse-submodules", str(repo), candidate["head"])
+                 "--no-recurse-submodules", str(repo), candidate["head"], operation="fetch_candidate")
             _git(data, checkout_env, "-c", "core.hooksPath=" + str(template),
-                 "-c", "core.attributesFile=" + os.devnull, "checkout", "--detach", candidate["head"])
-            _git(data, checkout_env, "remote", "add", "origin", origin)
+                 "-c", "core.attributesFile=" + os.devnull, "checkout", "--detach", candidate["head"], operation="checkout_candidate")
+            _git(data, checkout_env, "remote", "add", "origin", origin, operation="configure_candidate_origin")
             return _publish(data, candidate, policy, provingkit.resolve(), root, env)
     except Hold as error:
-        return {"status": "hold", "reason": str(error), "head": candidate.get("head"), "base": candidate.get("base")}
+        result = {"status": "hold", "reason": str(error), "head": candidate.get("head"), "base": candidate.get("base")}
+        if error.diagnostic is not None:
+            result["diagnostic"] = error.diagnostic
+        return result
     except (ValueError, KeyError, TypeError, UnicodeError) as error:
         return {"status": "hold", "reason": "invalid_publication_response_or_input",
                 "head": candidate.get("head"), "base": candidate.get("base")}

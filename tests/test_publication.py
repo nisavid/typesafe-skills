@@ -394,8 +394,72 @@ class PublicationTests(unittest.TestCase):
             with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
                 result = publish(world.repo, world.candidate, world.policy, world.dependency)
             self.assertEqual(result["reason"], "publication_command_outcome_unknown")
+            self.assertEqual(result["diagnostic"], {"operation": "create_pr", "exit_status": None})
             self.assertEqual(world.writes, ["branch", "create"])
             self.assertTrue(world.pr["isDraft"])
+
+    def test_failed_publication_reports_operation_without_command_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            world = HostedWorld(Path(temporary))
+            secret = "synthetic-credential-that-must-not-appear"
+            def process(args, **kwargs):
+                if Path(str(args[1])).name == "execute_git_publication.py":
+                    return subprocess.CompletedProcess(args, 17, secret, secret)
+                return world.run(args, **kwargs)
+            with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                result = publish(world.repo, world.candidate, world.policy, world.dependency)
+            self.assertEqual(result, {
+                "status": "hold", "reason": "publication_command_failed_or_outcome_unknown",
+                "head": world.candidate["head"], "base": world.candidate["base"],
+                "diagnostic": {"operation": "publish_branch", "exit_status": 17},
+            })
+            self.assertNotIn(secret, json.dumps(result))
+            self.assertEqual(world.writes, [])
+
+    def test_failed_candidate_fetch_is_distinguishable_from_publication(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            world = HostedWorld(Path(temporary))
+            def process(args, **kwargs):
+                if args[0] == "git" and "fetch" in args:
+                    return subprocess.CompletedProcess(args, 128, "private output", "private path")
+                return world.run(args, **kwargs)
+            with patch("subprocess.run", side_effect=process):
+                result = publish(world.repo, world.candidate, world.policy, world.dependency)
+            self.assertEqual(result["diagnostic"], {"operation": "fetch_candidate", "exit_status": 128})
+            self.assertEqual(result["reason"], "publication_command_failed_or_outcome_unknown")
+            self.assertNotIn("private", json.dumps(result))
+            self.assertEqual(world.writes, [])
+
+    def test_invalid_pr_observation_reports_only_safe_diagnostics(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            world = HostedWorld(Path(temporary))
+            def process(args, **kwargs):
+                if args[:3] == ["gh", "pr", "list"]:
+                    return subprocess.CompletedProcess(args, 0, "private non-JSON response", "private stderr")
+                return world.run(args, **kwargs)
+            with patch("subprocess.run", side_effect=process):
+                result = publish(world.repo, world.candidate, world.policy, world.dependency)
+            self.assertEqual(result["reason"], "publication_command_invalid_response")
+            self.assertEqual(result["diagnostic"], {"operation": "find_candidate_pr", "exit_status": 0})
+            self.assertNotIn("private", json.dumps(result))
+            self.assertEqual(world.writes, [])
+
+    def test_invalid_planner_json_retains_operation_and_stops_publication(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            world = HostedWorld(Path(temporary))
+            attempts = []
+            def process(args, **kwargs):
+                if Path(str(args[1])).name == "plan_git_publication.py":
+                    attempts.append("plan")
+                    return subprocess.CompletedProcess(args, 0, "private malformed plan", "private stderr")
+                return world.run(args, **kwargs)
+            with patch("subprocess.run", side_effect=process):
+                result = publish(world.repo, world.candidate, world.policy, world.dependency)
+            self.assertEqual(result["reason"], "invalid_publication_response_or_input")
+            self.assertEqual(result.get("diagnostic"), {"operation": "plan_branch_publication", "exit_status": 0})
+            self.assertNotIn("private", json.dumps(result))
+            self.assertEqual(world.writes, [])
+            self.assertEqual(attempts, ["plan"])
 
     def test_exact_existing_candidate_is_reused_without_new_forge_writes(self):
         with tempfile.TemporaryDirectory() as temporary:
