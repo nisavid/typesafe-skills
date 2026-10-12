@@ -27,6 +27,48 @@ TAXONOMY = ("IMPL means non-test source and configuration. TEST means automated 
             "OTHER means files outside those categories. FILES shows added, modified, "
             "and removed files as +, ~, and −.")
 
+# Public classifications from the pinned Versionkeeping executor. Arbitrary
+# reason text and evidence may contain credentials and never leave the adapter.
+PUBLISHER_REASON_CODES = frozenset({
+    "HTTPS_CREDENTIALS_UNAVAILABLE", "HTTPS_CREDENTIAL_PROVIDER_UNAVAILABLE",
+    "REVIEWED_DESTINATION_CHANGED", "REVIEWED_ENDPOINT_CHANGED",
+    "REVIEWED_DEFAULT_BRANCH_CHANGED", "REVIEWED_CONFIG_CHANGED",
+    "REVIEWED_LEASE_CHANGED", "GIT_OBJECT_ID_FORMAT_MISMATCH",
+    "POST_PUSH_REF_MISMATCH", "POST_PUSH_STATE_UNKNOWN",
+})
+
+
+def _publisher_failure(stdout):
+    if len(stdout) > 32768:
+        return None
+    try:
+        result = json.loads(stdout.decode("utf-8", "strict"))
+    except (ValueError, UnicodeError, RecursionError):
+        return None
+    if (not isinstance(result, dict) or type(result.get("schema_version")) is not int or
+            result["schema_version"] != 1 or result.get("status") != "blocked" or
+            type(result.get("push_attempted")) is not bool):
+        return None
+    reasons = result.get("reasons")
+    if (not isinstance(reasons, list) or not 1 <= len(reasons) <= 8 or
+            any(not isinstance(reason, dict) or not isinstance(reason.get("code"), str)
+                for reason in reasons)):
+        return None
+    diagnostic = {"status": "blocked", "push_attempted": result["push_attempted"],
+                  "reason_codes": [reason["code"] if reason["code"] in PUBLISHER_REASON_CODES
+                                   else "UNRECOGNIZED" for reason in reasons]}
+    failure_types = []
+    for reason in reasons:
+        if reason["code"] == "POST_PUSH_STATE_UNKNOWN":
+            evidence = reason.get("evidence")
+            failure = evidence.get("failure_type") if isinstance(evidence, dict) else None
+            failure_types.append(failure if isinstance(failure, str) and failure in {
+                "PUSH_FAILED", "PUSH_ENDPOINT_PROBE_FAILED",
+            } else "UNRECOGNIZED")
+    if failure_types:
+        diagnostic["failure_types"] = failure_types
+    return diagnostic
+
 
 class Hold(Exception):
     """A redacted reason suitable for operator-visible workflow output."""
@@ -50,8 +92,13 @@ def _run(arguments, repo, env, *, operation, json_output=False, input_text=None)
         raise Hold("publication_command_outcome_unknown", operation=operation) from error
     if result.returncode:
         # Command diagnostics may contain forge text or credential-helper output.
-        raise Hold("publication_command_failed_or_outcome_unknown", operation=operation,
-                   exit_status=result.returncode)
+        error = Hold("publication_command_failed_or_outcome_unknown", operation=operation,
+                     exit_status=result.returncode)
+        if operation == "publish_branch" and result.returncode == 1:
+            publisher = _publisher_failure(result.stdout)
+            if publisher is not None:
+                error.diagnostic["publisher"] = publisher
+        raise error
     # Unused stderr is deliberately discarded without decoding. Decode only
     # required stdout, after preserving the completed process's exit status.
     try:

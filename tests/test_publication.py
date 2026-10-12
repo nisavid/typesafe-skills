@@ -567,6 +567,101 @@ class PublicationTests(unittest.TestCase):
             self.assertNotIn(secret, json.dumps(result))
             self.assertEqual(world.writes, [])
 
+    def test_blocked_branch_reports_safe_publisher_reason_without_private_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            world = HostedWorld(Path(temporary))
+            secret = "synthetic-credential-that-must-not-appear"
+            def process(args, **kwargs):
+                if Path(str(args[1])).name == "execute_git_publication.py":
+                    response = {"schema_version": 1, "status": "blocked", "push_attempted": False,
+                                "reasons": [{"code": "HTTPS_CREDENTIALS_UNAVAILABLE",
+                                             "evidence": {"private": secret}}],
+                                "destination": {"private": secret}}
+                    return subprocess.CompletedProcess(args, 1, json.dumps(response).encode(), secret.encode())
+                return world.run(args, **kwargs)
+            with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                result = publish(world.repo, world.candidate, world.policy, world.dependency)
+            self.assertEqual(result["status"], "hold")
+            self.assertEqual(result["diagnostic"], {
+                "operation": "publish_branch", "exit_status": 1,
+                "publisher": {"status": "blocked", "push_attempted": False,
+                              "reason_codes": ["HTTPS_CREDENTIALS_UNAVAILABLE"]},
+            })
+            self.assertNotIn(secret, json.dumps(result))
+            self.assertEqual(world.writes, [])
+
+    def test_uncertain_push_preserves_effects_and_reports_safe_failure_type(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            world = HostedWorld(Path(temporary))
+            secret = "synthetic-credential-that-must-not-appear"
+            def process(args, **kwargs):
+                result = world.run(args, **kwargs)
+                if Path(str(args[1])).name == "execute_git_publication.py":
+                    response = {"schema_version": 1, "status": "blocked", "push_attempted": True,
+                                "reasons": [{"code": "POST_PUSH_STATE_UNKNOWN",
+                                             "evidence": {"failure_type": "PUSH_FAILED", "private": secret}}]}
+                    return subprocess.CompletedProcess(args, 1, json.dumps(response).encode(), secret.encode())
+                return result
+            with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                result = publish(world.repo, world.candidate, world.policy, world.dependency)
+            self.assertEqual(result["reason"], "publication_command_failed_or_outcome_unknown")
+            self.assertEqual(result["diagnostic"]["publisher"], {
+                "status": "blocked", "push_attempted": True,
+                "reason_codes": ["POST_PUSH_STATE_UNKNOWN"], "failure_types": ["PUSH_FAILED"],
+            })
+            self.assertEqual(world.writes, ["branch"])
+            self.assertEqual(world.remote_sha, world.candidate["head"])
+            self.assertIsNone(world.pr)
+            self.assertNotIn(secret, json.dumps(result))
+
+    def test_publisher_diagnostics_discard_malformed_and_unrecognized_private_fields(self):
+        secret = "synthetic-credential-that-must-not-appear"
+        blocked = {"schema_version": 1, "status": "blocked", "push_attempted": False,
+                   "reasons": [{"code": "HTTPS_CREDENTIALS_UNAVAILABLE"}]}
+        malformed = [b"\xff", b"not json", b"null", b"[]", b"[" * 2000 + b"]" * 2000,
+                     b" " * 32769,
+                     *[json.dumps({**blocked, key: value}).encode() for key, value in (
+                         ("schema_version", True), ("schema_version", 2), ("status", "verified"),
+                         ("push_attempted", 0), ("push_attempted", secret), ("reasons", None),
+                         ("reasons", []), ("reasons", [{"code": "HTTPS_CREDENTIALS_UNAVAILABLE"}] * 9),
+                         ("reasons", [None]), ("reasons", [{"code": [secret]}]),
+                     )]]
+        for stdout in malformed:
+            with self.subTest(stdout=stdout[:60]), tempfile.TemporaryDirectory() as temporary:
+                world = HostedWorld(Path(temporary))
+                def process(args, **kwargs):
+                    if Path(str(args[1])).name == "execute_git_publication.py":
+                        return subprocess.CompletedProcess(args, 1, stdout, secret.encode())
+                    return world.run(args, **kwargs)
+                with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                    result = publish(world.repo, world.candidate, world.policy, world.dependency)
+                self.assertEqual(result["diagnostic"], {"operation": "publish_branch", "exit_status": 1})
+                self.assertEqual(result["status"], "hold")
+                self.assertEqual(world.writes, [])
+                self.assertNotIn(secret, json.dumps(result))
+        for code, evidence, expected in (
+            (secret, {"private": secret}, {"reason_codes": ["UNRECOGNIZED"]}),
+            ("POST_PUSH_STATE_UNKNOWN", {"failure_type": secret},
+             {"reason_codes": ["POST_PUSH_STATE_UNKNOWN"], "failure_types": ["UNRECOGNIZED"]}),
+            ("POST_PUSH_STATE_UNKNOWN", [secret],
+             {"reason_codes": ["POST_PUSH_STATE_UNKNOWN"], "failure_types": ["UNRECOGNIZED"]}),
+        ):
+            with self.subTest(code=code, evidence=evidence), tempfile.TemporaryDirectory() as temporary:
+                world = HostedWorld(Path(temporary))
+                response = {**blocked, "push_attempted": True, "reasons": [{"code": code, "evidence": evidence}]}
+                def process(args, **kwargs):
+                    if Path(str(args[1])).name == "execute_git_publication.py":
+                        return subprocess.CompletedProcess(args, 1, json.dumps(response).encode(), secret.encode())
+                    return world.run(args, **kwargs)
+                with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                    result = publish(world.repo, world.candidate, world.policy, world.dependency)
+                self.assertEqual(result["diagnostic"]["publisher"], {
+                    "status": "blocked", "push_attempted": True, **expected,
+                })
+                self.assertEqual(result["status"], "hold")
+                self.assertEqual(world.writes, [])
+                self.assertNotIn(secret, json.dumps(result))
+
     def test_undecodable_create_output_preserves_status_and_prior_effects(self):
         for status, stream in ((17, 1), (17, 2), (0, 1)):
             with self.subTest(status=status, stream=stream), tempfile.TemporaryDirectory() as temporary:
