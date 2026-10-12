@@ -614,6 +614,30 @@ class PublicationTests(unittest.TestCase):
             self.assertIsNone(world.pr)
             self.assertNotIn(secret, json.dumps(result))
 
+    def test_uncertain_push_reports_git_timeout_without_repeating_publication(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            world = HostedWorld(Path(temporary))
+            secret = "synthetic-credential-that-must-not-appear"
+            def process(args, **kwargs):
+                result = world.run(args, **kwargs)
+                if Path(str(args[1])).name == "execute_git_publication.py":
+                    response = {"schema_version": 1, "status": "blocked", "push_attempted": True,
+                                "reasons": [{"code": "POST_PUSH_STATE_UNKNOWN",
+                                             "evidence": {"failure_type": "GIT_COMMAND_TIMEOUT", "private": secret}}]}
+                    return subprocess.CompletedProcess(args, 1, json.dumps(response).encode(), secret.encode())
+                return result
+            with patch("subprocess.run", side_effect=process), patch("urllib.request.urlopen", side_effect=world.http):
+                result = publish(world.repo, world.candidate, world.policy, world.dependency)
+            self.assertEqual(result["reason"], "publication_command_failed_or_outcome_unknown")
+            self.assertEqual(result["diagnostic"]["publisher"], {
+                "status": "blocked", "push_attempted": True,
+                "reason_codes": ["POST_PUSH_STATE_UNKNOWN"], "failure_types": ["GIT_COMMAND_TIMEOUT"],
+            })
+            self.assertEqual(world.writes, ["branch"])
+            self.assertEqual(world.remote_sha, world.candidate["head"])
+            self.assertIsNone(world.pr)
+            self.assertNotIn(secret, json.dumps(result))
+
     def test_publisher_diagnostics_discard_malformed_and_unrecognized_private_fields(self):
         secret = "synthetic-credential-that-must-not-appear"
         blocked = {"schema_version": 1, "status": "blocked", "push_attempted": False,

@@ -63,7 +63,7 @@ def _publisher_failure(stdout):
             evidence = reason.get("evidence")
             failure = evidence.get("failure_type") if isinstance(evidence, dict) else None
             failure_types.append(failure if isinstance(failure, str) and failure in {
-                "PUSH_FAILED", "PUSH_ENDPOINT_PROBE_FAILED",
+                "GIT_COMMAND_TIMEOUT", "PUSH_FAILED", "PUSH_ENDPOINT_PROBE_FAILED",
             } else "UNRECOGNIZED")
     if failure_types:
         diagnostic["failure_types"] = failure_types
