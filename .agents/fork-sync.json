@@ -6,7 +6,7 @@
   "upstream_url": "https://github.com/typesafe-ai/skills.git",
   "upstream_branch": "main",
   "upstream_anchor": "619f78a23e52cadfed03c9483235e2f333ad2416",
-  "candidate_prefix": "nisavid/upstream-sync/",
+  "candidate_prefix": "nisavid/upstream-sync-candidates/",
   "provingkit_pin": "4d02cc93ad67f2114018d7a595fc6580bb94cfad",
   "owned_paths": [
     ".agents/fork-ops.toml",
