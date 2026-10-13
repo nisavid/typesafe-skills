@@ -931,6 +931,10 @@ class PublicationTests(unittest.TestCase):
         self._assert_actual_publication()
 
     @unittest.skipUnless(os.environ.get("PROVINGKIT_TEST_ROOT"), "set PROVINGKIT_TEST_ROOT for the actual pinned helper contract")
+    def test_configured_candidates_publish_without_replacing_retained_sync_branch(self):
+        self._assert_actual_publication(retained_sync_branch=True)
+
+    @unittest.skipUnless(os.environ.get("PROVINGKIT_TEST_ROOT"), "set PROVINGKIT_TEST_ROOT for the actual pinned helper contract")
     def test_ancestry_only_updates_publish_and_resume_without_invented_file_changes(self):
         for history in ("empty", "reverted"):
             with self.subTest(history=history):
@@ -940,7 +944,7 @@ class PublicationTests(unittest.TestCase):
     def test_missing_rendered_history_keeps_the_published_pr_draft(self):
         self._assert_actual_publication("empty", missing_history=True)
 
-    def _assert_actual_publication(self, history_only=None, missing_history=False):
+    def _assert_actual_publication(self, history_only=None, missing_history=False, retained_sync_branch=False):
         dependency = Path(os.environ["PROVINGKIT_TEST_ROOT"])
         writer = dependency / "plugins/mergecraft/skills/writing-reviewable-pr-descriptions/scripts"
         publisher = dependency / "plugins/mergecraft/skills/publishing-reviewable-prs/scripts"
@@ -948,6 +952,10 @@ class PublicationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             world = HostedWorld(root, history_only=history_only)
+            if retained_sync_branch:
+                maintained_policy = json.loads((Path(__file__).resolve().parents[1] / ".agents/fork-sync.json").read_text())
+                world.policy["candidate_prefix"] = maintained_policy["candidate_prefix"]
+                world.branch = world.policy["candidate_prefix"] + world.candidate["upstream"][:12] + "-" + world.candidate["base"][:12]
             if history_only == "reverted":
                 # Keep this fixture sensitive to the planner's set normalization.
                 commits = world.git(world.repo, "rev-list", world.candidate["base"] + ".." + world.candidate["upstream"]).splitlines()
@@ -957,6 +965,13 @@ class PublicationTests(unittest.TestCase):
             world.real_run(["git", "init", "--bare", "-b", "main", str(remote)], check=True, capture_output=True)
             world.real_run(["git", "--git-dir", str(remote), "fetch", str(world.repo),
                             world.candidate["base"] + ":refs/heads/main"], check=True, capture_output=True)
+            if retained_sync_branch:
+                world.real_run(["git", "--git-dir", str(remote), "update-ref",
+                                "refs/heads/nisavid/upstream-sync", world.candidate["base"]],
+                               check=True, capture_output=True)
+                before = world.real_run(["git", "ls-remote", "--heads", str(remote)], check=True,
+                                        capture_output=True, text=True).stdout
+                retained_refs = {ref: oid for oid, ref in (line.split() for line in before.splitlines())}
             state = root / "forge.json"
             state.write_text(json.dumps({"pr": None, "base": world.candidate["base"], "head": world.candidate["head"]}))
             executable = root / "gh"
@@ -1040,6 +1055,12 @@ p.write_text(json.dumps(state))
                 second = publish(world.repo, world.candidate, world.policy, world.dependency)
                 self.assertEqual(second["status"], "published", second)
                 self.assertEqual(second["evidence"]["provenance"], "reconciled-unreceipted")
+                if retained_sync_branch:
+                    after = world.real_run(["git", "ls-remote", "--heads", str(remote)], check=True,
+                                           capture_output=True, text=True).stdout
+                    observed_refs = {ref: oid for oid, ref in (line.split() for line in after.splitlines())}
+                    expected_refs = {**retained_refs, "refs/heads/" + first["head_branch"]: world.candidate["head"]}
+                    self.assertEqual(observed_refs, expected_refs)
 
 
 if __name__ == "__main__":
