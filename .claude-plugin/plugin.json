@@ -1,6 +1,6 @@
 {
   "name": "typesafe",
-  "version": "0.5.7",
+  "version": "0.6.2",
   "description": "Agent skills for building with the TypeSafe System One API.",
   "author": {
     "name": "TypeSafe AI",

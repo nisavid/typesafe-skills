@@ -35,7 +35,7 @@ In Claude Code, you can explicitly invoke the plugin skill with `/typesafe:types
 
 | Skill | Purpose |
 |---|---|
-| [typesafe-ai](skills/typesafe-ai/SKILL.md) | Design TypeSafe workflows, find current docs and cookbooks, and compose typed judgments in code |
+| [typesafe-ai](skills/typesafe-ai/SKILL.md) | Design TypeSafe integrations: state and questions, request composition, live probing, and pointers to current docs |
 
 ## License
 
