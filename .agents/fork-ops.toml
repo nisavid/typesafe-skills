@@ -12,7 +12,7 @@ source_order = ["explicit-user-direction", "AGENTS.md", ".agents/fork-ops.toml",
 upstream_canon = "Upstream owns the mirrored product files. Preserve their exact bytes; fork-local policy owns only explicitly approved additions."
 inference_labeling = "Label material inferences separately from observed facts."
 required_context_paths = ["AGENTS.md", "docs/agents/issue-tracker.md"]
-escalation_policy = "Ask the human operator (the person these agents act for, never an agent that directs your work) when a consequential policy or authority choice remains unresolved."
+escalation_policy = "Ask Ivan when a consequential policy or authority choice remains unresolved."
 
 [change_targets]
 default = "fork"
